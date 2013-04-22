@@ -17,9 +17,6 @@
  *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#include <curl/curl.h>
-#include <openssl/err.h>
-#include <openssl/ssl.h>
 #include <locale.h>
 
 #include "config.h"
@@ -49,6 +46,7 @@ static gboolean opt_version;
 static gboolean opt_no_config;
 static gboolean opt_no_ask_password;
 gboolean tool_allow_unknown_options = FALSE;
+guint tool_debug = 0;
 
 static gboolean opt_debug_callback(const gchar *option_name, const gchar *value, gpointer data, GError **error)
 {
@@ -60,18 +58,18 @@ static gboolean opt_debug_callback(const gchar *option_name, const gchar *value,
     while (*opt)
     {
       if (g_ascii_strcasecmp(*opt, "api") == 0)
-        mega_debug |= MEGA_DEBUG_API;
+        tool_debug |= DEBUG_API;
       else if (g_ascii_strcasecmp(*opt, "fs") == 0)
-        mega_debug |= MEGA_DEBUG_FS;
+        tool_debug |= DEBUG_FS;
       else if (g_ascii_strcasecmp(*opt, "cache") == 0)
-        mega_debug |= MEGA_DEBUG_CACHE;
+        tool_debug |= DEBUG_CACHE;
 
       opt++;
     }
   }
   else
   {
-    mega_debug = MEGA_DEBUG_API;
+    tool_debug = DEBUG_API;
   }
 
   return TRUE;
@@ -94,74 +92,6 @@ static GOptionEntry auth_options[] =
   { "reload",             '\0',  0, G_OPTION_ARG_NONE,    &opt_reload_files,    "Reload filesystem cache",                NULL       },
   { NULL }
 };
-
-#if GLIB_CHECK_VERSION(2, 32, 0)
-
-static GMutex* openssl_mutexes = NULL;
-
-static void openssl_locking_callback(int mode, int type, const char *file, int line)
-{
-  if (mode & CRYPTO_LOCK)
-    g_mutex_lock(openssl_mutexes + type);
-  else
-    g_mutex_unlock(openssl_mutexes + type);
-}
-
-static unsigned long openssl_thread_id_callback()
-{
-  unsigned long ret;
-  ret = (unsigned long)g_thread_self();
-  return ret;
-}
-
-static void init_openssl_locking()
-{
-  gint i;
-
-  // initialize OpenSSL locking for multi-threaded operation
-  openssl_mutexes = g_new(GMutex, CRYPTO_num_locks());
-  for (i = 0; i < CRYPTO_num_locks(); i++)
-    g_mutex_init(openssl_mutexes + i);
-
-  SSL_library_init();
-  CRYPTO_set_id_callback(openssl_thread_id_callback);
-  CRYPTO_set_locking_callback(openssl_locking_callback);
-}
-
-#else
-
-static GMutex** openssl_mutexes = NULL;
-
-static void openssl_locking_callback(int mode, int type, const char *file, int line)
-{
-  if (mode & CRYPTO_LOCK)
-    g_mutex_lock(openssl_mutexes[type]);
-  else
-    g_mutex_unlock(openssl_mutexes[type]);
-}
-
-static unsigned long openssl_thread_id_callback()
-{
-  unsigned long ret;
-  ret = (unsigned long)g_thread_self();
-  return ret;
-}
-
-static void init_openssl_locking()
-{
-  gint i;
-
-  // initialize OpenSSL locking for multi-threaded operation
-  openssl_mutexes = g_new(GMutex*, CRYPTO_num_locks());
-  for (i = 0; i < CRYPTO_num_locks(); i++)
-    openssl_mutexes[i] = g_mutex_new();
-
-  SSL_library_init();
-  CRYPTO_set_id_callback(openssl_thread_id_callback);
-  CRYPTO_set_locking_callback(openssl_locking_callback);
-}
-
-#endif
 
 #ifdef G_OS_WIN32
 static gchar* get_tools_dir(void)
@@ -200,10 +130,9 @@ static void init(void)
 #endif
 
 #ifndef G_OS_WIN32
+  //XXX: is this still necessary with GIO?
   signal(SIGPIPE, SIG_IGN);
 #endif
-
-  init_openssl_locking();
 
 #ifdef G_OS_WIN32
   gchar* tools_dir = get_tools_dir();
@@ -378,68 +307,160 @@ void tool_init(gint* ac, gchar*** av, const gchar* tool_name, GOptionEntry* tool
     opt_password = input_password();
 }
 
-mega_session* tool_start_session(void)
+static gboolean is_email_valid(const gchar* email)
+{
+  const gchar* email_regex =
+   "(?(DEFINE)                                                                                           " 
+   "  (?<addr_spec>       (?&local_part) \\@ (?&domain))                                                 " 
+   "  (?<local_part>      (?&dot_atom) | (?&quoted_string))                                              " 
+   "  (?<domain>          (?&dot_atom) | (?&domain_literal))                                             " 
+   "  (?<domain_literal>  (?&CFWS)? \\[ (?: (?&FWS)? (?&dcontent))* (?&FWS)? \\] (?&CFWS)?)              " 
+   "  (?<dcontent>        (?&dtext) | (?&quoted_pair))                                                   " 
+   "  (?<dtext>           (?&NO_WS_CTL) | [\\x21-\\x5a\\x5e-\\x7e])                                      " 
+   "  (?<atext>           (?&ALPHA) | (?&DIGIT) | [!#\\$%&'*+-/=?^_`{|}~])                               " 
+   "  (?<atom>            (?&CFWS)? (?&atext)+ (?&CFWS)?)                                                " 
+   "  (?<dot_atom>        (?&CFWS)? (?&dot_atom_text) (?&CFWS)?)                                         " 
+   "  (?<dot_atom_text>   (?&atext)+ (?: \\. (?&atext)+)*)                                               " 
+   "  (?<text>            [\\x01-\\x09\\x0b\\x0c\\x0e-\\x7f])                                            " 
+   "  (?<quoted_pair>     \\\\ (?&text))                                                                 " 
+   "  (?<qtext>           (?&NO_WS_CTL) | [\\x21\\x23-\\x5b\\x5d-\\x7e])                                 " 
+   "  (?<qcontent>        (?&qtext) | (?&quoted_pair))                                                   " 
+   "  (?<quoted_string>   (?&CFWS)? (?&DQUOTE) (?:(?&FWS)? (?&qcontent))* (?&FWS)? (?&DQUOTE) (?&CFWS)?) " 
+   "  (?<word>            (?&atom) | (?&quoted_string))                                                  " 
+   "  (?<phrase>          (?&word)+)                                                                     " 
+   "  (?<FWS>             (?: (?&WSP)* (?&CRLF))? (?&WSP)+)                                              " 
+   "  (?<ctext>           (?&NO_WS_CTL) | [\\x21-\\x27\\x2a-\\x5b\\x5d-\\x7e])                           " 
+   "  (?<ccontent>        (?&ctext) | (?&quoted_pair) | (?&comment))                                     " 
+   "  (?<comment>         \\( (?: (?&FWS)? (?&ccontent))* (?&FWS)? \\) )                                 " 
+   "  (?<CFWS>            (?: (?&FWS)? (?&comment))* (?: (?:(?&FWS)? (?&comment)) | (?&FWS)))            " 
+   "  (?<NO_WS_CTL>       [\\x01-\\x08\\x0b\\x0c\\x0e-\\x1f\\x7f])                                       " 
+   "  (?<ALPHA>           [A-Za-z])                                                                      " 
+   "  (?<DIGIT>           [0-9])                                                                         " 
+   "  (?<CRLF>            \\x0d \\x0a)                                                                   " 
+   "  (?<DQUOTE>          \" )                                                                           " 
+   "  (?<WSP>             [\\x20\\x09])                                                                  " 
+   ")                                                                                                    " 
+   "(?&addr_spec)";
+
+  return g_regex_match_simple(email_regex, email, G_REGEX_EXTENDED | G_REGEX_ANCHORED, 0);
+}
+
+static gboolean is_valid_user_handle(const gchar* handle)
+{
+  return g_regex_match_simple("^[a-zA-Z0-9]{11}$", handle, 0, 0);
+}
+
+MegaSession* tool_start_session(void)
 {
   GError *local_err = NULL;
+  MegaSession* session;
+  gboolean needs_login = TRUE;
   gchar* sid = NULL;
-  gboolean loaded = FALSE;
+  
+  session = mega_session_new();
+  
+  if (tool_debug & DEBUG_API)
+    g_object_set(mega_session_get_api(session), "debug", TRUE, NULL);
 
-  mega_session* s = mega_session_new();
+  // try to load cache
 
-  // try to load cached session data (they are valid for 10 minutes since last
-  // user_get or refresh)
-  if (!mega_session_load(s, opt_username, opt_password, opt_cache_timout, &sid, &local_err))
+  if (!opt_reload_files)
   {
-    g_clear_error(&local_err);
-
-    if (!mega_session_open(s, opt_username, opt_password, sid, &local_err))
+    if (mega_session_load(session, opt_username, opt_password, &local_err))
     {
-      g_printerr("ERROR: Can't login to mega.co.nz: %s\n", local_err->message);
-      goto err;
+      if (opt_cache_timout > 0 && mega_session_is_fresh(session, opt_cache_timout))
+        return session;
     }
-
-    if (!mega_session_refresh(s, &local_err))
+    else
     {
-      g_printerr("ERROR: Can't read filesystem info from mega.co.nz: %s\n", local_err->message);
-      goto err;
-    }
+      if (g_error_matches(local_err, MEGA_SESSION_ERROR, MEGA_SESSION_ERROR_WRONG_PASSWORD))
+      {
+        g_printerr("ERROR: Incorrect password for account '%s'\n", opt_username);
+        goto err;
+      }
 
-    loaded = TRUE;
-    mega_session_save(s, NULL);
+      g_clear_error(&local_err);
+    }
   }
 
-  if (opt_reload_files && !loaded)
+  // try to open existing session (load user info from the server)
+
+  sid = g_strdup(mega_api_get_session_id(mega_session_get_api(session)));
+  mega_session_close(session);
+
+  if (sid)
   {
-    if (!mega_session_refresh(s, &local_err))
+    if (mega_session_open(session, opt_password, sid, &local_err))
     {
-      g_printerr("ERROR: Can't read filesystem info from mega.co.nz: %s\n", local_err->message);
-      goto err;
+      needs_login = FALSE;
+    }
+    else
+    {
+      if (!g_error_matches(local_err, MEGA_API_ERROR, MEGA_API_ERROR_EACCESS))
+      {
+        g_printerr("ERROR: Can't get account information: %s\n", local_err ? local_err->message : "unknown error");
+        g_free(sid);
+        goto err;
+      }
+
+      g_clear_error(&local_err);
     }
 
-    mega_session_save(s, NULL);
+    g_free(sid);
   }
 
-  g_free(sid);
-  return s;
+  if (needs_login)
+  {
+    if (is_valid_user_handle(opt_username))
+    {
+      if (!mega_session_login_anon(session, opt_username, opt_password, &local_err))
+      {
+        if (g_error_matches(local_err, MEGA_API_ERROR, MEGA_API_ERROR_ENOENT))
+          g_printerr("ERROR: Incorrect username or password for account '%s'\n", opt_username);
+        else
+          g_printerr("ERROR: Login failed: %s\n", local_err ? local_err->message : "unknown error");
+
+        goto err;
+      }
+    }
+    else if (is_email_valid(opt_username))
+    {
+      if (!mega_session_login(session, opt_username, opt_password, &local_err))
+      {
+        if (g_error_matches(local_err, MEGA_API_ERROR, MEGA_API_ERROR_ENOENT))
+          g_printerr("ERROR: Incorrect username or password for account '%s'\n", opt_username);
+        else
+          g_printerr("ERROR: Login failed: %s\n", local_err ? local_err->message : "unknown error");
+
+        goto err;
+      }
+    }
+    else
+    {
+      g_printerr("ERROR: Invalid user name (%s), provide either email or anonymous account handle\n", opt_username);
+      goto err;
+    }
+  }
+
+  if (mega_filesystem_load(mega_session_get_filesystem(session), &local_err))
+  {
+    mega_session_save(session, NULL);
+    return session;
+  }
+  else
+  {
+    g_printerr("ERROR: Can't read filesystem info from mega.co.nz: %s\n", local_err->message);
+    goto err;
+  }
 
 err:
-  mega_session_free(s);
+  g_object_unref(session);
   g_clear_error(&local_err);
-  g_free(sid);
   return NULL;
 }
 
-void tool_fini(mega_session* s)
+void tool_fini(MegaSession* s)
 {
-  if (s)
-    mega_session_free(s);
-
+  g_clear_object(&s);
   g_option_context_free(opt_context);
-  curl_global_cleanup();
-  CRYPTO_cleanup_all_ex_data();
-  ERR_free_strings();
-
-  CRYPTO_set_id_callback(NULL);
-  CRYPTO_set_locking_callback(NULL);
-  g_free(openssl_mutexes);
 }

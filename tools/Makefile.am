@@ -3,18 +3,13 @@ AM_CFLAGS = \
   $(OPENSSL_CFLAGS) \
   $(CURL_CFLAGS) \
   -I$(top_srcdir)/sjson \
-  -I$(srcdir)/libtools \
   -I$(top_srcdir)
 
 noinst_LTLIBRARIES = libtools.la
 
 libtools_la_SOURCES = \
-  libtools/http.c \
-  libtools/http.h \
-  libtools/oldmega.c \
-  libtools/oldmega.h \
-  libtools/tools.c \
-  libtools/tools.h
+  tools.c \
+  tools.h
 
 LDADD = \
   libtools.la \
@@ -31,7 +26,7 @@ megafs_CFLAGS = \
   $(AM_CFLAGS) \
   $(FUSE_CFLAGS)
 
-bin_PROGRAMS = megadf megadl megaget megals megamkdir megaput megareg megarm megamv megasync
+bin_PROGRAMS = megadf # megadl megaget megals megamkdir megaput megareg megarm megamv megasync
 
 megadf_SOURCES     = df.c
 megadl_SOURCES     = dl.c
@@ -45,6 +40,6 @@ megamv_SOURCES     = mv.c
 megasync_SOURCES   = sync.c
 
 if ENABLE_FUSE
-bin_PROGRAMS += megafs
+#bin_PROGRAMS += megafs
 megafs_SOURCES     = fs.c
 endif

@@ -37,7 +37,7 @@ static GOptionEntry entries[] =
   { NULL }
 };
 
-static gchar* format_size(guint64 size)
+static gchar* format_size(gint64 size)
 {
   if (opt_human)
     return g_format_size_full(size, G_FORMAT_SIZE_IEC_UNITS);
@@ -46,13 +46,13 @@ static gchar* format_size(guint64 size)
   else if (opt_gb)
     size /= 1024 * 1024 * 1024;
 
-  return g_strdup_printf("%" G_GUINT64_FORMAT, size);
+  return g_strdup_printf("%" G_GINT64_FORMAT, size);
 }
 
 int main(int ac, char* av[])
 {
   GError *local_err = NULL;
-  mega_session* s;
+  MegaSession* s;
 
   tool_init(&ac, &av, "- display mega.co.nz storage quotas/usage", entries);
 
@@ -88,31 +88,39 @@ int main(int ac, char* av[])
   if (!s)
     return 1;
 
-  mega_user_quota* q = mega_session_user_quota(s, &local_err);
-  if (!q)
+  gchar* info = mega_session_get_info(s, &local_err);
+  if (!info)
   {
-    g_printerr("ERROR: Can't determine disk usage: %s\n", local_err->message);
+    g_printerr("ERROR: Can't determine disk usage: %s\n", local_err ? local_err->message : "unknown error");
     g_clear_error(&local_err);
     goto err;
   }
 
-  guint64 free = q->total >= q->used ? q->total - q->used : 0;
+  gint64 total = s_json_get_member_int(info, "total_storage", -1);
+  gint64 used = s_json_get_member_int(info, "used_storage", -1);
+  gint64 free = total >= used ? total - used : 0;
 
   if (opt_total)
-    g_print("%s\n", format_size(q->total));
+    g_print("%s\n", format_size(total));
   else if (opt_used)
-    g_print("%s\n", format_size(q->used));
+    g_print("%s\n", format_size(used));
   else if (opt_free)
     g_print("%s\n", format_size(free));
   else
   {
-    g_print("Total: %s\n", format_size(q->total));
-    g_print("Used:  %s\n", format_size(q->used));
-    g_print("Free:  %s\n", format_size(free));
+    gchar* type = s_json_get_member_string(info, "user_type");
+    if (type)
+      g_print("User type: %s\n", type);
+    g_free(type);
+
+    // XXX: subscription info
+
+    g_print("Total:     %s\n", format_size(total));
+    g_print("Used:      %s\n", format_size(used));
+    g_print("Free:      %s\n", format_size(free));
   }
 
-  g_free(q);
-
+  g_free(info);
   tool_fini(s);
   return 0;
 

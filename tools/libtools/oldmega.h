@@ -20,7 +20,7 @@
 #ifndef __OLD_MEGA_H
 #define __OLD_MEGA_H
 
-#include <glib.h>
+#include "mega/mega.h"
 
 // API error domain
 
@@ -103,8 +103,7 @@ struct _mega_node
   gchar* parent_handle;
   gchar* user_handle;
   gchar* su_handle;
-  gsize key_len;
-  guchar* key;
+  MegaAesKey* key;
   gint type;
   guint64 size;
   glong timestamp;
@@ -164,7 +163,7 @@ mega_node*          mega_session_stat               (mega_session* s, const gcha
 mega_node*          mega_session_mkdir              (mega_session* s, const gchar* path, GError** err);
 gboolean            mega_session_rm                 (mega_session* s, const gchar* path, GError** err);
 mega_node*          mega_session_put                (mega_session* s, const gchar* remote_path, const gchar* local_path, GError** err);
-gchar*              mega_session_new_node_attribute (mega_session* s, const guchar* data, gsize len, const gchar* type, const guchar* key, GError** err);
+gchar*              mega_session_new_node_attribute (mega_session* s, const guchar* data, gsize len, const gchar* type, MegaAesKey* key, GError** err);
 gboolean            mega_session_get                (mega_session* s, const gchar* local_path, const gchar* remote_path, GError** err);
 
 gboolean            mega_session_open_exp_folder    (mega_session* s, const gchar* n, const gchar* key, GError** err);

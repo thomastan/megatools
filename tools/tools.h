@@ -25,14 +25,8 @@
 #include <gio/gio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "oldmega.h"
-
-void            tool_init_bare        (gint* ac, gchar*** av, const gchar* tool_name, GOptionEntry* tool_entries);
-void            tool_init             (gint* ac, gchar*** av, const gchar* tool_name, GOptionEntry* tool_entries);
-mega_session*   tool_start_session    (void);
-void            tool_fini             (mega_session* s);
-
-extern gboolean tool_allow_unknown_options;
+#include <mega/mega.h>
+#include "sjson.h"
 
 #ifdef G_OS_WIN32
 #define ESC_CLREOL ""
@@ -47,5 +41,17 @@ extern gboolean tool_allow_unknown_options;
 #define ESC_GRAY "\x1b[30;1m"
 #define ESC_NORMAL "\x1b[0m"
 #endif
+
+#define DEBUG_API   0x0001
+#define DEBUG_FS    0x0002
+#define DEBUG_CACHE 0x0004
+
+extern guint tool_debug;
+extern gboolean tool_allow_unknown_options;
+
+void            tool_init_bare        (gint* ac, gchar*** av, const gchar* tool_name, GOptionEntry* tool_entries);
+void            tool_init             (gint* ac, gchar*** av, const gchar* tool_name, GOptionEntry* tool_entries);
+MegaSession*    tool_start_session    (void);
+void            tool_fini             (MegaSession* s);
 
 #endif
