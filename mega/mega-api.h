@@ -20,7 +20,7 @@
 #ifndef __MEGA_API_H__
 #define __MEGA_API_H__
 
-#include <glib-object.h>
+#include <mega/megatypes.h>
 
 #define MEGA_TYPE_API            (mega_api_get_type())
 #define MEGA_API(obj)            (G_TYPE_CHECK_INSTANCE_CAST((obj), MEGA_TYPE_API, MegaApi))
@@ -29,7 +29,6 @@
 #define MEGA_IS_API_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE((klass),  MEGA_TYPE_API))
 #define MEGA_API_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS((obj),  MEGA_TYPE_API, MegaApiClass))
 
-typedef struct _MegaApi MegaApi;
 typedef struct _MegaApiClass MegaApiClass;
 typedef struct _MegaApiPrivate MegaApiPrivate;
 
@@ -105,6 +104,8 @@ GType                   mega_api_get_type               (void) G_GNUC_CONST;
 MegaApi*                mega_api_new                    (void);
 gchar*                  mega_api_call                   (MegaApi* api, const gchar* request, GError** error);
 gchar*                  mega_api_call_simple            (MegaApi* api, gchar expects, GError** error, const gchar* format, ...);
+const gchar*            mega_api_get_session_id         (MegaApi* api);
+void                    mega_api_set_session_id         (MegaApi* api, const gchar* session_id);
 
 G_END_DECLS
 

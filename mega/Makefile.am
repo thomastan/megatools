@@ -43,12 +43,15 @@ libmega_la_SOURCES = \
   mega-session.h \
   mega-node.c \
   mega-node.h \
+  mega-filesystem.c \
+  mega-filesystem.h \
   mega-file-uploader.c \
   mega-file-uploader.h \
   mega-file-downloader.c \
   mega-file-downloader.h \
   utils.c \
   utils.h \
+  private-utils.h \
   megatypes.h \
   mega.h \
   $(GLIB_GENERATED)
@@ -63,7 +66,7 @@ mega_enum_types_sources = $(libmega_la_SOURCES)
 
 BUILT_SOURCES = $(GLIB_GENERATED)
 
-pkginclude_HEADERS = $(filter-out mega-marshal.h,$(filter %.h,$(libmega_la_SOURCES)))
+pkginclude_HEADERS = $(filter-out mega-marshal.h private-utils.h,$(filter %.h,$(libmega_la_SOURCES)))
 pkgincludedir = $(includedir)/mega
 
 CLEANFILES =

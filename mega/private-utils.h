@@ -17,18 +17,19 @@
  *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#ifndef __MEGA_TYPES_H__
-#define __MEGA_TYPES_H__
+#include "sjson.h"
+#include "mega-aes-key.h"
 
-#include <gio/gio.h>
+G_GNUC_UNUSED
+static MegaAesKey* s_json_get_member_aes_key(const gchar* json, const gchar* member)
+{
+  gchar* str = s_json_get_member_string(json, member);
+  MegaAesKey* key = mega_aes_key_new_from_ubase64(str);
+  g_free(str);
 
-typedef struct _MegaHttpClient MegaHttpClient;
-typedef struct _MegaHttpIOStream MegaHttpIOStream;
-typedef struct _MegaHttpOutputStream MegaHttpOutputStream;
-typedef struct _MegaHttpInputStream MegaHttpInputStream;
-typedef struct _MegaSession MegaSession;
-typedef struct _MegaFilesystem MegaFilesystem;
-typedef struct _MegaNode MegaNode;
-typedef struct _MegaApi MegaApi;
+  if (mega_aes_key_is_loaded(key))
+    return key;
 
-#endif
+  g_object_unref(key);
+  return NULL;
+}

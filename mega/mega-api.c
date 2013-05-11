@@ -372,6 +372,35 @@ GQuark mega_api_error_quark(void)
   return g_quark_from_static_string("mega-api-error-quark");
 }
 
+/**
+ * mega_api_get_session_id:
+ * @api: a #MegaApi
+ *
+ * Get session ID.
+ *
+ * Returns: Session ID.
+ */
+const gchar* mega_api_get_session_id(MegaApi* api)
+{
+  g_return_val_if_fail(MEGA_IS_API(api), NULL);
+
+  return api->priv->sid;
+}
+
+/**
+ * mega_api_set_session_id:
+ * @api: a #MegaApi
+ * @session_id: 
+ *
+ * Set session ID.
+ */
+void mega_api_set_session_id(MegaApi* api, const gchar* session_id)
+{
+  g_return_if_fail(MEGA_IS_API(api));
+
+  api->priv->sid = g_strdup(session_id);
+}
+
 // {{{ GObject type setup
 
 static void mega_api_set_property(GObject *object, guint property_id, const GValue *value, GParamSpec *pspec)

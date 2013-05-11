@@ -27,6 +27,13 @@
 #include <mega/mega-http-client.h>
 #include <mega/mega-chunked-cbc-mac.h>
 #include <mega/mega-aes-ctr-encryptor.h>
+#include <mega/mega-api.h>
+#include <mega/mega-file-key.h>
+#include <mega/mega-file-uploader.h>
+#include <mega/mega-file-downloader.h>
+#include <mega/mega-node.h>
+#include <mega/mega-filesystem.h>
+#include <mega/mega-session.h>
 #include <mega/utils.h>
 
 #include <mega/mega-enum-types.h>

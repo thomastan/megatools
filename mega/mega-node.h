@@ -20,7 +20,7 @@
 #ifndef __MEGA_NODE_H__
 #define __MEGA_NODE_H__
 
-#include <glib-object.h>
+#include <mega/megatypes.h>
 
 #define MEGA_TYPE_NODE            (mega_node_get_type())
 #define MEGA_NODE(obj)            (G_TYPE_CHECK_INSTANCE_CAST((obj), MEGA_TYPE_NODE, MegaNode))
@@ -28,8 +28,8 @@
 #define MEGA_IS_NODE(obj)         (G_TYPE_CHECK_INSTANCE_TYPE((obj), MEGA_TYPE_NODE))
 #define MEGA_IS_NODE_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE((klass),  MEGA_TYPE_NODE))
 #define MEGA_NODE_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS((obj),  MEGA_TYPE_NODE, MegaNodeClass))
+#define MEGA_NODE_ERROR           mega_node_error_quark()
 
-typedef struct _MegaNode MegaNode;
 typedef struct _MegaNodeClass MegaNodeClass;
 typedef struct _MegaNodePrivate MegaNodePrivate;
 
@@ -44,11 +44,38 @@ struct _MegaNodeClass
   GObjectClass parent_class;
 };
 
+typedef enum
+{
+  MEGA_NODE_ERROR_OTHER
+} MegaNodeError;
+
+typedef enum
+{
+  MEGA_NODE_TYPE_FILE = 0,
+  MEGA_NODE_TYPE_FOLDER = 1,
+  MEGA_NODE_TYPE_ROOT = 2,
+  MEGA_NODE_TYPE_INBOX = 3,
+  MEGA_NODE_TYPE_TRASH = 4,
+  MEGA_NODE_TYPE_NETWORK = 9,
+  MEGA_NODE_TYPE_CONTACT = 8
+} MegaNodeType;
+
 G_BEGIN_DECLS
 
 GType                   mega_node_get_type              (void) G_GNUC_CONST;
+gint                    mega_node_error_quark           (void) G_GNUC_CONST;
 
-MegaNode*               mega_node_new                   (void);
+MegaNode*               mega_node_new                   (MegaFilesystem* filesystem);
+MegaNode*               mega_node_new_contacts          (MegaFilesystem* filesystem);
+gboolean                mega_node_load                  (MegaNode* node, const gchar* json, GError** error);
+gboolean                mega_node_load_user             (MegaNode* node, const gchar* json, GError** error);
+gboolean                mega_node_is_child              (MegaNode* node, MegaNode* parent);
+gboolean                mega_node_is_toplevel           (MegaNode* node);
+const gchar*            mega_node_get_handle            (MegaNode* node);
+const gchar*            mega_node_get_name              (MegaNode* node);
+gchar*                  mega_node_get_json              (MegaNode* node);
+gboolean                mega_node_set_json              (MegaNode* node, const gchar* json);
+void                    mega_node_clear                 (MegaNode* node);
 
 G_END_DECLS
 
