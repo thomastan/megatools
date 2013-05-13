@@ -1,7 +1,5 @@
 AM_CFLAGS = \
   $(GLIB_CFLAGS) \
-  $(OPENSSL_CFLAGS) \
-  $(CURL_CFLAGS) \
   -I$(top_srcdir)/sjson \
   -I$(top_srcdir)
 
@@ -14,8 +12,6 @@ libtools_la_SOURCES = \
 LDADD = \
   libtools.la \
   $(GLIB_LIBS) \
-  $(OPENSSL_LIBS) \
-  $(CURL_LIBS) \
   $(top_builddir)/mega/libmega.la
 
 megafs_LDADD = \
