@@ -1,3 +1,36 @@
+megatools 1.9.92 - 2013-05-??
+=============================
+
+This release brings several major improvements to megatools:
+
+- Megatools no longer depend on OpenSSL and cURL, now it uses nettle
+  (basis of GnuPG) and GMP library for its cryptography.
+- Tools were rewritten on top of megatools' own libmega.
+- It is now possible to create and use ephemeral (anonymous) accounts.
+  (eg. this allows you to upload files without creating and verifying 
+  an account and publish uploaded files to other people)
+- Megasync got smarter and faster:
+  - Many operations are performed in batch HTTP requests (so it's now
+    possible to create hunderds of directories in one HTTP request).
+  - Added options to replace changed files, and delete removed files.
+  - Added exclude options with globbing support.
+- Megaget now supports remote path globbing. (megaget /Root/Dir/*.mp4)
+- Megafs allows you to access files in read-only/random access mode.
+- Megamv is now implemented.
+- Megatools now respect system proxy settings.
+- Thumbnails generation can be disabled via command-line switch.
+- Downloads can be resumed in megadl and megaget
+- You can now use libmega's programming API from JavaScript, Python, and
+  other languages that support gobject-introspection, to create
+  GUI tools for Mega.co.nz. (the API is reasonably complete, as
+  it's used for all the megatools)
+
+Fixed bugs:
+
+- PDF thumbnails taking too much space and cpu time (each page was
+  rendered to /tmp, not just the first page).
+
+
 megatools 1.9.91 - 2013-04-14
 =============================
 
