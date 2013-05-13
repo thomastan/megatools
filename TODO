@@ -1,11 +1,35 @@
-Priorities:
-- port tools to new high-level api
-- streaming download/upload using the new API
-- sample gui using the high-level API
-- megafs file reading/download
+- annotate/document: MegaHttpClient, MegaChunkedCbcMac, MegaAesCtrEncryptor,
+  MegaHttpInputStream
 
-Bugs/issues to solve for the next release:
-- ephemeral account creation/login
+- MegaApi
+  - cancellable API calls
+
+- megadf:
+  - show account subscription info
+
+- streaming download/upload using the new API
+  - MegaFileUploader
+  - MegaFileDownloader
+  - progress reporting
+
+- filesystem querying (parent, children, filtering, globbing, paths)
+- filesystem manipulation (rename, re-parent, add nodes)
+- access rights (read-only/special cases)
+- node tree/sub-tree sync optimization idea
+- port tools to a new high-level api
+
+- megareg:
+  - present: http://g.static.mega.co.nz/pages/terms.html
+  - interactive prompt for confirmation link
+
+- megafs:
+  - file reading/download
+  - check that threads are used correctly in megafs
+
+----
+
+Other bugs/issues to solve for the next release:
+
 - thumbnails (allow to disable them via config option)
 - pdf thumbnails taking too much space (renders each page)
 - respect system proxy settings
@@ -16,59 +40,28 @@ Bugs/issues to solve for the next release:
   - dconf / dbus-launch info in man pages
 
 
-Misc
-====
-
-- annotate/document: MegaHttpClient, MegaChunkedCbcMac, MegaAesCtrEncryptor,
-  MegaHttpInputStream
+tests
+=====
 
 - unit tests for mega-aes-ctr encryptor
 - split chunked cbc-mac calculation (chunk + meta-mac)
-
-- progress reporting
-- chunked upload/download
-- batched puts for multi-file upload
-  - changelist based sync
-
-(user visible feature for the release)
-- fuse file reading using new dl api
-  - check threads are used correctly in megafs
 
 
 libmega
 =======
 
-- MegaApi
-  - cancellable API calls
-  - async API (mostly for use in gjs)
-
-- MegaSession
-  - save/load
-  - open/login/logout/close
-  - create (ephemeral)
-  - create (full)
-  - user account info
-
-- MegaNode
-- MegaFileUploader
-- MegaFileDownloader
-
 - better randomness on linux (see serious users of nettle api for examples)
+
 
 mega-gjs
 ========
 
-- Try running download/upload operations in parallel (async)
 - alter file attributes in mega.js (thumbnails, etc.)
-- Implement sample gui in gjs (Mega.co.nz video player?)
-  - for js api testing
 - show samples of js api on the website
 
 
 tools
 =====
-
-- port ul/dl to new libmega API (on the tools-port branch)
 
 - use gnome password manager / some other password manager agent
 
