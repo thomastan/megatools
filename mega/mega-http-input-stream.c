@@ -18,13 +18,9 @@
  */
 
 /**
- * SECTION:mega-http-input-stream
- * @short_description: 
- * @see_also: #GInputStream
- * @stability: Stable
- * @include: mega-http-input-stream.h
+ * MegaHttpInputStream:
  *
- * Description...
+ * Stream for reading HTTP response body.
  */
 
 #include "mega-http-input-stream.h"
@@ -62,9 +58,7 @@ static guint signals[N_SIGNALS];
  */
 MegaHttpInputStream* mega_http_input_stream_new(MegaHttpClient* client)
 {
-  MegaHttpInputStream *http_input_stream = g_object_new(MEGA_TYPE_HTTP_INPUT_STREAM, "client", client, NULL);
-
-  return http_input_stream;
+  return g_object_new(MEGA_TYPE_HTTP_INPUT_STREAM, "client", client, NULL);
 }
 
 static gssize stream_read(GInputStream *stream, void *buffer, gsize count, GCancellable *cancellable, GError **error)
@@ -78,9 +72,9 @@ static gssize stream_read(GInputStream *stream, void *buffer, gsize count, GCanc
  * mega_http_input_stream_get_length:
  * @http_input_stream: a #MegaHttpInputStream
  *
- * Description...
+ * Get length of the response body.
  *
- * Returns: 
+ * Returns: Length of he response or -1 if it can't be retrieved.
  */
 gssize mega_http_input_stream_get_length(MegaHttpInputStream* http_input_stream, GCancellable* cancellable, GError** err)
 {
@@ -128,21 +122,11 @@ static void mega_http_input_stream_init(MegaHttpInputStream *http_input_stream)
   http_input_stream->priv = G_TYPE_INSTANCE_GET_PRIVATE(http_input_stream, MEGA_TYPE_HTTP_INPUT_STREAM, MegaHttpInputStreamPrivate);
 }
 
-static void mega_http_input_stream_dispose(GObject *object)
-{
-  //MegaHttpInputStream *http_input_stream = MEGA_HTTP_INPUT_STREAM(object);
-
-  // Free everything that may hold reference to MegaHttpInputStream
-
-  G_OBJECT_CLASS(mega_http_input_stream_parent_class)->dispose(object);
-}
-
 static void mega_http_input_stream_finalize(GObject *object)
 {
   MegaHttpInputStream *http_input_stream = MEGA_HTTP_INPUT_STREAM(object);
 
-  if (http_input_stream->priv->client)
-    g_object_unref(http_input_stream->priv->client);
+  g_clear_object(&http_input_stream->priv->client);
 
   G_OBJECT_CLASS(mega_http_input_stream_parent_class)->finalize(object);
 }
@@ -155,7 +139,6 @@ static void mega_http_input_stream_class_init(MegaHttpInputStreamClass *klass)
   gobject_class->set_property = mega_http_input_stream_set_property;
   gobject_class->get_property = mega_http_input_stream_get_property;
 
-  gobject_class->dispose = mega_http_input_stream_dispose;
   gobject_class->finalize = mega_http_input_stream_finalize;
 
   g_type_class_add_private(klass, sizeof(MegaHttpInputStreamPrivate));

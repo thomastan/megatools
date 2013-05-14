@@ -18,13 +18,10 @@
  */
 
 /**
- * SECTION:mega-http-io-stream
- * @short_description: 
- * @see_also: #GIOStream
- * @stability: Stable
- * @include: mega-http-io-stream.h
+ * MegaHttpIOStream:
  *
- * Description...
+ * Object that is used to pass input and output streams from
+ * #mega_http_client_post and #mega_http_client_post_simple.
  */
 
 #include "mega-http-io-stream.h"
@@ -64,9 +61,7 @@ static guint signals[N_SIGNALS];
  */
 MegaHttpIOStream* mega_http_io_stream_new(MegaHttpClient* client)
 {
-  MegaHttpIOStream *http_io_stream = g_object_new(MEGA_TYPE_HTTP_IO_STREAM, "client", client, NULL);
-
-  return http_io_stream;
+  return g_object_new(MEGA_TYPE_HTTP_IO_STREAM, "client", client, NULL);
 }
 
 static GInputStream* get_input_stream(GIOStream* stream)
@@ -142,8 +137,7 @@ static void mega_http_io_stream_finalize(GObject *object)
 {
   MegaHttpIOStream *http_io_stream = MEGA_HTTP_IO_STREAM(object);
 
-  if (http_io_stream->priv->client)
-    g_object_unref(http_io_stream->priv->client);
+  g_clear_object(&http_io_stream->priv->client);
 
   G_OBJECT_CLASS(mega_http_io_stream_parent_class)->finalize(object);
 }
