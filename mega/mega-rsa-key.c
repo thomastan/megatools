@@ -54,23 +54,6 @@ struct _MegaRsaKeyPrivate
   mpz_t e;
 };
 
-// {{{ GObject property and signal enums
-//
-enum MegaRsaKeyProp
-{
-  PROP_0,
-  N_PROPERTIES
-};
-
-enum MegaRsaKeySignal
-{
-  N_SIGNALS
-};
-
-static guint signals[N_SIGNALS];
-
-// }}}
-
 #define MPI_SET_BITS(ptr, bits) *(guint16*)(ptr) = GUINT16_TO_BE(bits)
 #define MPI_BITS(ptr) GUINT16_FROM_BE(*(guint16*)(ptr))
 #define MPI_BYTES(ptr) ((MPI_BITS(ptr) + 7) / 8)
@@ -180,9 +163,7 @@ static void encrypt_rsa(mpz_t r, mpz_t s, mpz_t e, mpz_t m)
  */
 MegaRsaKey* mega_rsa_key_new(void)
 {
-  MegaRsaKey *rsa_key = g_object_new(MEGA_TYPE_RSA_KEY, NULL);
-
-  return rsa_key;
+  return g_object_new(MEGA_TYPE_RSA_KEY, NULL);
 }
 
 /**
@@ -310,7 +291,7 @@ GBytes* mega_rsa_key_decrypt(MegaRsaKey* rsa_key, const gchar* cipher)
 /**
  * mega_rsa_key_decrypt_sid:
  * @rsa_key: a #MegaRsaKey
- * @cipher: Encrypted session id (CSID).
+ * @cipher: UBase64 encoded encrypted session id (csid).
  *
  * Decrypt Mega.co.nz session ID.
  *
@@ -341,7 +322,7 @@ gchar* mega_rsa_key_decrypt_sid(MegaRsaKey* rsa_key, const gchar* cipher)
 /**
  * mega_rsa_key_load_enc_privk:
  * @rsa_key: a #MegaRsaKey
- * @privk: Mega.co.nz formatted AES encrypted private key.
+ * @privk: UBase64 encoded and encrypted private key.
  * @enc_key: AES key used for decryption.
  *
  * Load encrypted private key.
@@ -384,7 +365,7 @@ gboolean mega_rsa_key_load_enc_privk(MegaRsaKey* rsa_key, const gchar* privk, Me
 /**
  * mega_rsa_key_load_pubk:
  * @rsa_key: a #MegaRsaKey
- * @pubk: Mega.co.nz formatted public key.
+ * @pubk: UBase64 encoded public key.
  *
  * Load public key.
  *
@@ -538,48 +519,13 @@ gboolean mega_rsa_key_generate(MegaRsaKey* rsa_key)
 
 // {{{ GObject type setup
 
-static void mega_rsa_key_set_property(GObject *object, guint property_id, const GValue *value, GParamSpec *pspec)
-{
-  MegaRsaKey *rsa_key = MEGA_RSA_KEY(object);
-
-  switch (property_id)
-  {
-    default:
-      G_OBJECT_WARN_INVALID_PROPERTY_ID(object, property_id, pspec);
-  }
-}
-
-static void mega_rsa_key_get_property(GObject *object, guint property_id, GValue *value, GParamSpec *pspec)
-{
-  MegaRsaKey *rsa_key = MEGA_RSA_KEY(object);
-
-  switch (property_id)
-  {
-    default:
-      G_OBJECT_WARN_INVALID_PROPERTY_ID(object, property_id, pspec);
-  }
-}
-
 G_DEFINE_TYPE(MegaRsaKey, mega_rsa_key, G_TYPE_OBJECT);
 
 static void mega_rsa_key_init(MegaRsaKey *rsa_key)
 {
-  rsa_key->priv = G_TYPE_INSTANCE_GET_PRIVATE(rsa_key, MEGA_TYPE_RSA_KEY, MegaRsaKeyPrivate);
-
-  MegaRsaKeyPrivate* priv = rsa_key->priv;
+  MegaRsaKeyPrivate* priv = rsa_key->priv = G_TYPE_INSTANCE_GET_PRIVATE(rsa_key, MEGA_TYPE_RSA_KEY, MegaRsaKeyPrivate);
 
   mpz_inits(priv->p, priv->q, priv->d, priv->u, priv->m, priv->e, NULL);
-}
-
-static void mega_rsa_key_dispose(GObject *object)
-{
-  MegaRsaKey *rsa_key = MEGA_RSA_KEY(object);
-
-  //
-  // Free everything that may hold reference to MegaRsaKey
-  //
-
-  G_OBJECT_CLASS(mega_rsa_key_parent_class)->dispose(object);
 }
 
 static void mega_rsa_key_finalize(GObject *object)
@@ -589,32 +535,16 @@ static void mega_rsa_key_finalize(GObject *object)
 
   mpz_clears(priv->p, priv->q, priv->d, priv->u, priv->m, priv->e, NULL);
 
-  //rsa_private_key_clear(&rsa_key->priv->priv);
-  //rsa_public_key_clear(&rsa_key->priv->pub);
-  
   G_OBJECT_CLASS(mega_rsa_key_parent_class)->finalize(object);
 }
 
 static void mega_rsa_key_class_init(MegaRsaKeyClass *klass)
 {
   GObjectClass *gobject_class = G_OBJECT_CLASS(klass);
-  GParamSpec *param_spec;
 
-  gobject_class->set_property = mega_rsa_key_set_property;
-  gobject_class->get_property = mega_rsa_key_get_property;
-
-  gobject_class->dispose = mega_rsa_key_dispose;
   gobject_class->finalize = mega_rsa_key_finalize;
 
   g_type_class_add_private(klass, sizeof(MegaRsaKeyPrivate));
-
-  /* object properties */
-
-  /* object properties end */
-
-  /* object signals */
-
-  /* object signals end */
 }
 
 // }}}

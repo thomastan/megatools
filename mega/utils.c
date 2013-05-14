@@ -27,11 +27,57 @@
 #endif
 
 /**
- * mega_base64urlencode:
+ * mega_format_hex:
  * @data: (element-type guchar) (array length=len) (transfer none):
  * @len:
  *
- * Returns: (transfer full):
+ * Format binary buffer into string representation. Several formats are
+ * supported:
+ *
+ *   - hexadecimal packed (eg. 0100FF12)
+ *   - C like hexadecimal byte prepresentation (eg. 0x01 0x00 0xFF 0x12)
+ *   - C string escape sequence (eg. "\x01\x00\xFF\x12")
+ *
+ * Returns: Formatted string.
+ */
+gchar* mega_format_hex(const guchar* data, gsize len, MegaHexFormat fmt)
+{
+  gsize i;
+  GString* str;
+
+  g_return_val_if_fail(data != NULL, NULL);
+  
+  str = g_string_sized_new(64);
+  
+  if (fmt == MEGA_HEX_FORMAT_PACKED)
+  {
+    for (i = 0; i < len; i++)
+      g_string_append_printf(str, "%02X", (guint)data[i]);
+  }
+  else if (fmt == MEGA_HEX_FORMAT_C)
+  {
+    for (i = 0; i < len; i++)
+      g_string_append_printf(str, "%s0x%02X", i ? " " : "", (guint)data[i]);
+  }
+  else if (fmt == MEGA_HEX_FORMAT_STRING)
+  {
+    g_string_append(str, "\"");
+    for (i = 0; i < len; i++)
+      g_string_append_printf(str, "\\x%02X", (guint)data[i]);
+    g_string_append(str, "\"");
+  }
+    
+  return g_string_free(str, FALSE);
+}
+
+/**
+ * mega_base64urlencode:
+ * @data: (element-type guint8) (array length=len) (transfer none): Buffer data.
+ * @len: Buffer length.
+ *
+ * Encode buffer to Base64 and replace + with -, / with _ and remove trailing =.
+ *
+ * Returns: (transfer full): UBase64 encoded string.
  */
 gchar* mega_base64urlencode(const guchar* data, gsize len)
 {
@@ -66,10 +112,12 @@ gchar* mega_base64urlencode(const guchar* data, gsize len)
 
 /**
  * mega_base64urldecode:
- * @str:
- * @len: (out):
+ * @str: UBase64 encoded string.
+ * @len: (out): Decoded data length.
  *
- * Returns: (transfer full) (element-type guchar) (array length=len):
+ * Decode string encoded with #mega_base64urlencode.
+ *
+ * Returns: (transfer full) (element-type guint8) (array length=len): Decoded data.
  */
 guchar* mega_base64urldecode(const gchar* str, gsize* len)
 {
@@ -100,76 +148,19 @@ guchar* mega_base64urldecode(const gchar* str, gsize* len)
   return data;
 }
 
-/**
- * mega_format_hex:
- * @data: (element-type guchar) (array length=len) (transfer none):
- * @len:
- */
-gchar* mega_format_hex(const guchar* data, gsize len, MegaHexFormat fmt)
-{
-  gsize i;
-  GString* str;
-
-  g_return_val_if_fail(data != NULL, NULL);
-  
-  str = g_string_sized_new(64);
-  
-  if (fmt == MEGA_HEX_FORMAT_PACKED)
-  {
-    for (i = 0; i < len; i++)
-      g_string_append_printf(str, "%02X", (guint)data[i]);
-  }
-  else if (fmt == MEGA_HEX_FORMAT_C)
-  {
-    for (i = 0; i < len; i++)
-      g_string_append_printf(str, "%s0x%02X", i ? " " : "", (guint)data[i]);
-  }
-  else if (fmt == MEGA_HEX_FORMAT_STRING)
-  {
-    g_string_append(str, "\"");
-    for (i = 0; i < len; i++)
-      g_string_append_printf(str, "\\x%02X", (guint)data[i]);
-    g_string_append(str, "\"");
-  }
-    
-  return g_string_free(str, FALSE);
-}
-
-/**
- * mega_gbytes_to_string:
- * @bytes: (transfer none):
- * @len: (out):
- *
- * Returns: (transfer full) (element-type guint8) (array length=len): Data
- */
-guchar* mega_gbytes_to_string(GBytes *bytes, gsize *len)
-{
-  g_return_val_if_fail(bytes != NULL, NULL);
-  g_return_val_if_fail(len != NULL, NULL);
-
-  gchar* str = g_malloc0(g_bytes_get_size(bytes) + 1);
-  memcpy(str, g_bytes_get_data(bytes, NULL), g_bytes_get_size(bytes));
-  if (len)
-    *len = g_bytes_get_size(bytes);
-  return str;
-}
-
-//Send this urlencoded when uploading chunk: '?c=' + mega_base64urlencode(chksum(ul_sendchunks[p].buffer))
-
-void mega_checksum(const guchar* buffer, gsize len, guchar csum[12])
-{
-  memset(csum, 0, 12);
-
-  while (len--)
-    csum[len % 12] ^= buffer[len];
-}
-
 // randomness
 
 G_LOCK_DEFINE_STATIC(yarrow);
 static gboolean yarrow_ready = FALSE;
 static struct yarrow256_ctx yarrow_ctx;
 
+/**
+ * mega_randomness: (skip)
+ * @buffer: Buffer.
+ * @len: Buffer length.
+ *
+ * Fill buffer with random data.
+ */
 void mega_randomness(guchar* buffer, gsize len)
 {
   guchar buf[YARROW256_SEED_FILE_SIZE];
@@ -208,6 +199,7 @@ void mega_randomness(guchar* buffer, gsize len)
 }
 
 // for use in nettle funcs
+
 void mega_randomness_nettle(gpointer ctx, guint len, guchar* buffer)
 {
   mega_randomness(buffer, len);

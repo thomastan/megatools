@@ -27,6 +27,8 @@ libmega_la_SOURCES = \
   mega-file-key.h \
   mega-chunked-cbc-mac.c \
   mega-chunked-cbc-mac.h \
+  mega-aes-ctr-encryptor.c \
+  mega-aes-ctr-encryptor.h \
   mega-http-client.c \
   mega-http-client.h \
   mega-http-io-stream.c \
@@ -35,16 +37,14 @@ libmega_la_SOURCES = \
   mega-http-input-stream.h \
   mega-http-output-stream.c \
   mega-http-output-stream.h \
-  mega-aes-ctr-encryptor.c \
-  mega-aes-ctr-encryptor.h \
   mega-api.c \
   mega-api.h \
-  mega-session.c \
-  mega-session.h \
   mega-node.c \
   mega-node.h \
   mega-filesystem.c \
   mega-filesystem.h \
+  mega-session.c \
+  mega-session.h \
   mega-file-uploader.c \
   mega-file-uploader.h \
   mega-file-downloader.c \

@@ -39,23 +39,6 @@ struct _MegaFileKeyPrivate
   guchar key[32];
 };
 
-// {{{ GObject property and signal enums
-//
-enum MegaFileKeyProp
-{
-  PROP_0,
-  N_PROPERTIES
-};
-
-enum MegaFileKeySignal
-{
-  N_SIGNALS
-};
-
-static guint signals[N_SIGNALS];
-
-// }}}
-
 #define DW(p, n) (*((guint32*)(p) + (n)))
 
 static void unpack_node_key(guchar node_key[32], guchar aes_key[16], guchar nonce[8], guchar meta_mac_xor[8])
@@ -81,7 +64,6 @@ static void unpack_node_key(guchar node_key[32], guchar aes_key[16], guchar nonc
   }
 }
 
-G_GNUC_UNUSED
 static void pack_node_key(guchar node_key[32], guchar aes_key[16], guchar nonce[8], guchar meta_mac[16])
 {
   DW(node_key, 0) = DW(aes_key, 0) ^ DW(nonce, 0);
@@ -304,28 +286,6 @@ void mega_file_key_set_mac(MegaFileKey* file_key, MegaChunkedCbcMac* mac)
 }
 
 // {{{ GObject type setup
-//
-static void mega_file_key_set_property(GObject *object, guint property_id, const GValue *value, GParamSpec *pspec)
-{
-  MegaFileKey *file_key = MEGA_FILE_KEY(object);
-
-  switch (property_id)
-  {
-    default:
-      G_OBJECT_WARN_INVALID_PROPERTY_ID(object, property_id, pspec);
-  }
-}
-
-static void mega_file_key_get_property(GObject *object, guint property_id, GValue *value, GParamSpec *pspec)
-{
-  MegaFileKey *file_key = MEGA_FILE_KEY(object);
-
-  switch (property_id)
-  {
-    default:
-      G_OBJECT_WARN_INVALID_PROPERTY_ID(object, property_id, pspec);
-  }
-}
 
 G_DEFINE_TYPE(MegaFileKey, mega_file_key, MEGA_TYPE_AES_KEY);
 
@@ -334,42 +294,20 @@ static void mega_file_key_init(MegaFileKey *file_key)
   file_key->priv = G_TYPE_INSTANCE_GET_PRIVATE(file_key, MEGA_TYPE_FILE_KEY, MegaFileKeyPrivate);
 }
 
-static void mega_file_key_dispose(GObject *object)
-{
-  //MegaFileKey *file_key = MEGA_FILE_KEY(object);
-  //
-  // Free everything that may hold reference to MegaFileKey
-  //
-  G_OBJECT_CLASS(mega_file_key_parent_class)->dispose(object);
-}
-
 static void mega_file_key_finalize(GObject *object)
 {
-  //MegaFileKey *file_key = MEGA_FILE_KEY(object);
-  //
+  G_GNUC_UNUSED MegaFileKey *file_key = MEGA_FILE_KEY(object);
+
   G_OBJECT_CLASS(mega_file_key_parent_class)->finalize(object);
 }
 
 static void mega_file_key_class_init(MegaFileKeyClass *klass)
 {
   GObjectClass *gobject_class = G_OBJECT_CLASS(klass);
-  GParamSpec *param_spec;
 
-  gobject_class->set_property = mega_file_key_set_property;
-  gobject_class->get_property = mega_file_key_get_property;
-
-  gobject_class->dispose = mega_file_key_dispose;
   gobject_class->finalize = mega_file_key_finalize;
 
   g_type_class_add_private(klass, sizeof(MegaFileKeyPrivate));
-
-  /* object properties */
-
-  /* object properties end */
-
-  /* object signals */
-
-  /* object signals end */
 }
 
 // }}}

@@ -79,23 +79,6 @@ struct _MegaAesKeyPrivate
   struct aes_ctx dec_key;
 };
 
-// {{{ GObject property and signal enums
-
-enum MegaAesKeyProp
-{
-  PROP_0,
-  N_PROPERTIES
-};
-
-enum MegaAesKeySignal
-{
-  N_SIGNALS
-};
-
-static guint signals[N_SIGNALS];
-
-// }}}
-
 /**
  * mega_aes_key_new:
  *
@@ -105,9 +88,7 @@ static guint signals[N_SIGNALS];
  */
 MegaAesKey* mega_aes_key_new(void)
 {
-  MegaAesKey *aes_key = g_object_new(MEGA_TYPE_AES_KEY, NULL);
-
-  return aes_key;
+  return g_object_new(MEGA_TYPE_AES_KEY, NULL);
 }
 
 /**
@@ -808,28 +789,6 @@ gchar* mega_aes_key_get_enc_ubase64(MegaAesKey* aes_key, MegaAesKey* enc_key)
 
 // {{{ GObject type setup
 
-static void mega_aes_key_set_property(GObject *object, guint property_id, const GValue *value, GParamSpec *pspec)
-{
-  MegaAesKey *aes_key = MEGA_AES_KEY(object);
-
-  switch (property_id)
-  {
-    default:
-      G_OBJECT_WARN_INVALID_PROPERTY_ID(object, property_id, pspec);
-  }
-}
-
-static void mega_aes_key_get_property(GObject *object, guint property_id, GValue *value, GParamSpec *pspec)
-{
-  MegaAesKey *aes_key = MEGA_AES_KEY(object);
-
-  switch (property_id)
-  {
-    default:
-      G_OBJECT_WARN_INVALID_PROPERTY_ID(object, property_id, pspec);
-  }
-}
-
 G_DEFINE_TYPE(MegaAesKey, mega_aes_key, G_TYPE_OBJECT);
 
 static void mega_aes_key_init(MegaAesKey *aes_key)
@@ -837,42 +796,11 @@ static void mega_aes_key_init(MegaAesKey *aes_key)
   aes_key->priv = G_TYPE_INSTANCE_GET_PRIVATE(aes_key, MEGA_TYPE_AES_KEY, MegaAesKeyPrivate);
 }
 
-static void mega_aes_key_dispose(GObject *object)
-{
-  //MegaAesKey *aes_key = MEGA_AES_KEY(object);
-  //
-  // Free everything that may hold reference to MegaAesKey
-  //
-  G_OBJECT_CLASS(mega_aes_key_parent_class)->dispose(object);
-}
-
-static void mega_aes_key_finalize(GObject *object)
-{
-  //MegaAesKey *aes_key = MEGA_AES_KEY(object);
-  //
-  G_OBJECT_CLASS(mega_aes_key_parent_class)->finalize(object);
-}
-
 static void mega_aes_key_class_init(MegaAesKeyClass *klass)
 {
   GObjectClass *gobject_class = G_OBJECT_CLASS(klass);
-  GParamSpec *param_spec;
-
-  gobject_class->set_property = mega_aes_key_set_property;
-  gobject_class->get_property = mega_aes_key_get_property;
-
-  gobject_class->dispose = mega_aes_key_dispose;
-  gobject_class->finalize = mega_aes_key_finalize;
 
   g_type_class_add_private(klass, sizeof(MegaAesKeyPrivate));
-
-  /* object properties */
-
-  /* object properties end */
-
-  /* object signals */
-
-  /* object signals end */
 }
 
 // }}}

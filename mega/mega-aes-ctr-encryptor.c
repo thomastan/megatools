@@ -18,13 +18,12 @@
  */
 
 /**
- * SECTION:mega-aes-ctr-encryptor
- * @short_description: 
- * @see_also: #GObject
- * @stability: Stable
- * @include: mega-aes-ctr-encryptor.h
+ * MegaAesCtrEncryptor:
  *
- * Description...
+ * Stream converter that can be used for CTR encryption and decryption with MAC
+ * calculation.
+ *
+ * To use it you need to create #GConverterInputStream or #GConverterOutputStream.
  */
 
 #include <string.h>
@@ -38,23 +37,6 @@ struct _MegaAesCtrEncryptorPrivate
   MegaAesCtrEncryptorDirection direction;
 };
 
-// {{{ GObject property and signal enums
-
-enum MegaAesCtrEncryptorProp
-{
-  PROP_0,
-  N_PROPERTIES
-};
-
-enum MegaAesCtrEncryptorSignal
-{
-  N_SIGNALS
-};
-
-static guint signals[N_SIGNALS];
-
-// }}}
-
 /**
  * mega_aes_ctr_encryptor_new:
  *
@@ -64,14 +46,14 @@ static guint signals[N_SIGNALS];
  */
 MegaAesCtrEncryptor* mega_aes_ctr_encryptor_new(void)
 {
-  MegaAesCtrEncryptor *aes_ctr_encryptor = g_object_new(MEGA_TYPE_AES_CTR_ENCRYPTOR, NULL);
-
-  return aes_ctr_encryptor;
+  return g_object_new(MEGA_TYPE_AES_CTR_ENCRYPTOR, NULL);
 }
 
 static void reset(GConverter *converter)
 {
   MegaAesCtrEncryptor *encryptor = MEGA_AES_CTR_ENCRYPTOR(converter);
+
+  // Not implemented
 }
 
 static GConverterResult convert(GConverter *converter, const void *inbuf, gsize inbuf_size, void *outbuf, gsize outbuf_size, GConverterFlags flags, gsize *bytes_read, gsize *bytes_written, GError **error)
@@ -154,9 +136,7 @@ void mega_aes_ctr_encryptor_set_key(MegaAesCtrEncryptor* aes_ctr_encryptor, Mega
   g_return_if_fail(MEGA_IS_AES_CTR_ENCRYPTOR(aes_ctr_encryptor));
   g_return_if_fail(MEGA_IS_FILE_KEY(key));
 
-  if (aes_ctr_encryptor->priv->key)
-    g_object_unref(aes_ctr_encryptor->priv->key);
-
+  g_clear_object(&aes_ctr_encryptor->priv->key);
   aes_ctr_encryptor->priv->key = g_object_ref(key);
 }
 
@@ -194,9 +174,7 @@ void mega_aes_ctr_encryptor_set_mac(MegaAesCtrEncryptor* aes_ctr_encryptor, Mega
   priv = aes_ctr_encryptor->priv;
   priv->direction = dir;
 
-  if (priv->mac)
-    g_object_unref(priv->mac);
-
+  g_clear_object(&priv->mac);
   priv->mac = g_object_ref(mac);
 
   // mac iv is nonce + nonce
@@ -208,28 +186,6 @@ void mega_aes_ctr_encryptor_set_mac(MegaAesCtrEncryptor* aes_ctr_encryptor, Mega
 }
 
 // {{{ GObject type setup
-
-static void mega_aes_ctr_encryptor_set_property(GObject *object, guint property_id, const GValue *value, GParamSpec *pspec)
-{
-  MegaAesCtrEncryptor *aes_ctr_encryptor = MEGA_AES_CTR_ENCRYPTOR(object);
-
-  switch (property_id)
-  {
-    default:
-      G_OBJECT_WARN_INVALID_PROPERTY_ID(object, property_id, pspec);
-  }
-}
-
-static void mega_aes_ctr_encryptor_get_property(GObject *object, guint property_id, GValue *value, GParamSpec *pspec)
-{
-  MegaAesCtrEncryptor *aes_ctr_encryptor = MEGA_AES_CTR_ENCRYPTOR(object);
-
-  switch (property_id)
-  {
-    default:
-      G_OBJECT_WARN_INVALID_PROPERTY_ID(object, property_id, pspec);
-  }
-}
 
 static void mega_aes_ctr_encryptor_converter_iface_init(GConverterIface *iface)
 {
@@ -248,28 +204,20 @@ static void mega_aes_ctr_encryptor_init(MegaAesCtrEncryptor *aes_ctr_encryptor)
 
 static void mega_aes_ctr_encryptor_dispose(GObject *object)
 {
-  G_GNUC_UNUSED MegaAesCtrEncryptor *aes_ctr_encryptor = MEGA_AES_CTR_ENCRYPTOR(object);
+  MegaAesCtrEncryptor *encryptor = MEGA_AES_CTR_ENCRYPTOR(object);
+  MegaAesCtrEncryptorPrivate* priv = encryptor->priv;
 
-  // Free everything that may hold reference to MegaAesCtrEncryptor
+  g_clear_object(&priv->mac);
 
   G_OBJECT_CLASS(mega_aes_ctr_encryptor_parent_class)->dispose(object);
 }
 
 static void mega_aes_ctr_encryptor_finalize(GObject *object)
 {
-  G_GNUC_UNUSED MegaAesCtrEncryptor *aes_ctr_encryptor = MEGA_AES_CTR_ENCRYPTOR(object);
+  MegaAesCtrEncryptor *encryptor = MEGA_AES_CTR_ENCRYPTOR(object);
+  MegaAesCtrEncryptorPrivate* priv = encryptor->priv;
 
-  if (aes_ctr_encryptor->priv->key)
-  {
-    g_object_unref(aes_ctr_encryptor->priv->key);
-    aes_ctr_encryptor->priv->key = NULL;
-  }
-
-  if (aes_ctr_encryptor->priv->mac)
-  {
-    g_object_unref(aes_ctr_encryptor->priv->mac);
-    aes_ctr_encryptor->priv->mac = NULL;
-  }
+  g_clear_object(&priv->key);
 
   G_OBJECT_CLASS(mega_aes_ctr_encryptor_parent_class)->finalize(object);
 }
@@ -277,23 +225,11 @@ static void mega_aes_ctr_encryptor_finalize(GObject *object)
 static void mega_aes_ctr_encryptor_class_init(MegaAesCtrEncryptorClass *klass)
 {
   GObjectClass *gobject_class = G_OBJECT_CLASS(klass);
-  GParamSpec *param_spec;
-
-  gobject_class->set_property = mega_aes_ctr_encryptor_set_property;
-  gobject_class->get_property = mega_aes_ctr_encryptor_get_property;
 
   gobject_class->dispose = mega_aes_ctr_encryptor_dispose;
   gobject_class->finalize = mega_aes_ctr_encryptor_finalize;
 
   g_type_class_add_private(klass, sizeof(MegaAesCtrEncryptorPrivate));
-
-  /* object properties */
-
-  /* object properties end */
-
-  /* object signals */
-
-  /* object signals end */
 }
 
 // }}}
