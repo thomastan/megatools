@@ -309,6 +309,7 @@ void tool_init(gint* ac, gchar*** av, const gchar* tool_name, GOptionEntry* tool
 
 static gboolean is_email_valid(const gchar* email)
 {
+  // Source: http://stackoverflow.com/questions/201323/using-a-regular-expression-to-validate-an-email-address/1917982#1917982
   const gchar* email_regex =
    "(?(DEFINE)                                                                                           " 
    "  (?<addr_spec>       (?&local_part) \\@ (?&domain))                                                 " 
