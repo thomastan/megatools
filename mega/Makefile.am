@@ -1,5 +1,3 @@
-SUBDIRS = gjs
-
 AM_CFLAGS = \
   -DG_LOG_DOMAIN=\"Mega\" \
   $(GLIB_CFLAGS) \

@@ -79,7 +79,6 @@ AC_CONFIG_FILES([
   libmega.pc
   sjson/Makefile
   mega/Makefile
-  mega/gjs/Makefile
   tools/Makefile
   tests/Makefile
   docs/Makefile
