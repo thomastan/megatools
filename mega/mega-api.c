@@ -18,11 +18,9 @@
  */
 
 /**
- * SECTION:mega-api
- * @title 
- * @short_description: 
+ * MegaApi:
  *
- * Description...
+ * Object to perform Mega.co.nz API calls.
  */
 
 #include <stdlib.h>
@@ -87,26 +85,26 @@ static const gchar* srv_error_to_string(gint code)
 {
   switch (code) 
   {
-    case MEGA_API_SERVER_ERROR_EINTERNAL           : return "EINTERNAL";
-    case MEGA_API_SERVER_ERROR_EARGS               : return "EARGS";
-    case MEGA_API_SERVER_ERROR_EAGAIN              : return "EAGAIN";
-    case MEGA_API_SERVER_ERROR_ERATELIMIT          : return "ERATELIMIT";
-    case MEGA_API_SERVER_ERROR_EFAILED             : return "EFAILED";
-    case MEGA_API_SERVER_ERROR_ETOOMANY            : return "ETOOMANY";
-    case MEGA_API_SERVER_ERROR_ERANGE              : return "ERANGE";
-    case MEGA_API_SERVER_ERROR_EEXPIRED            : return "EEXPIRED";
-    case MEGA_API_SERVER_ERROR_ENOENT              : return "ENOENT";
-    case MEGA_API_SERVER_ERROR_ECIRCULAR           : return "ECIRCULAR";
-    case MEGA_API_SERVER_ERROR_EACCESS             : return "EACCESS";
-    case MEGA_API_SERVER_ERROR_EEXIST              : return "EEXIST";
-    case MEGA_API_SERVER_ERROR_EINCOMPLETE         : return "EINCOMPLETE";
-    case MEGA_API_SERVER_ERROR_EKEY                : return "EKEY";
-    case MEGA_API_SERVER_ERROR_ESID                : return "ESID";
-    case MEGA_API_SERVER_ERROR_EBLOCKED            : return "EBLOCKED";
-    case MEGA_API_SERVER_ERROR_EOVERQUOTA          : return "EOVERQUOTA";
-    case MEGA_API_SERVER_ERROR_ETEMPUNAVAIL        : return "ETEMPUNAVAIL";
-    case MEGA_API_SERVER_ERROR_ETOOMANYCONNECTIONS : return "ETOOMANYCONNECTIONS";
-    default                                        : return "EUNKNOWN";
+    case MEGA_API_ERROR_EINTERNAL           : return "EINTERNAL";
+    case MEGA_API_ERROR_EARGS               : return "EARGS";
+    case MEGA_API_ERROR_EAGAIN              : return "EAGAIN";
+    case MEGA_API_ERROR_ERATELIMIT          : return "ERATELIMIT";
+    case MEGA_API_ERROR_EFAILED             : return "EFAILED";
+    case MEGA_API_ERROR_ETOOMANY            : return "ETOOMANY";
+    case MEGA_API_ERROR_ERANGE              : return "ERANGE";
+    case MEGA_API_ERROR_EEXPIRED            : return "EEXPIRED";
+    case MEGA_API_ERROR_ENOENT              : return "ENOENT";
+    case MEGA_API_ERROR_ECIRCULAR           : return "ECIRCULAR";
+    case MEGA_API_ERROR_EACCESS             : return "EACCESS";
+    case MEGA_API_ERROR_EEXIST              : return "EEXIST";
+    case MEGA_API_ERROR_EINCOMPLETE         : return "EINCOMPLETE";
+    case MEGA_API_ERROR_EKEY                : return "EKEY";
+    case MEGA_API_ERROR_ESID                : return "ESID";
+    case MEGA_API_ERROR_EBLOCKED            : return "EBLOCKED";
+    case MEGA_API_ERROR_EOVERQUOTA          : return "EOVERQUOTA";
+    case MEGA_API_ERROR_ETEMPUNAVAIL        : return "ETEMPUNAVAIL";
+    case MEGA_API_ERROR_ETOOMANYCONNECTIONS : return "ETOOMANYCONNECTIONS";
+    default                                 : return "EUNKNOWN";
   }
 }
 
@@ -114,26 +112,28 @@ static gint srv_error_to_api_error(gint code)
 {
   switch (code)
   {
-    case MEGA_API_SERVER_ERROR_EINTERNAL           : return MEGA_API_ERROR_EINTERNAL;
-    case MEGA_API_SERVER_ERROR_EARGS               : return MEGA_API_ERROR_EARGS;
-    case MEGA_API_SERVER_ERROR_EAGAIN              : return MEGA_API_ERROR_EAGAIN;
-    case MEGA_API_SERVER_ERROR_ERATELIMIT          : return MEGA_API_ERROR_ERATELIMIT;
-    case MEGA_API_SERVER_ERROR_EFAILED             : return MEGA_API_ERROR_EFAILED;
-    case MEGA_API_SERVER_ERROR_ETOOMANY            : return MEGA_API_ERROR_ETOOMANY;
-    case MEGA_API_SERVER_ERROR_ERANGE              : return MEGA_API_ERROR_ERANGE;
-    case MEGA_API_SERVER_ERROR_EEXPIRED            : return MEGA_API_ERROR_EEXPIRED;
-    case MEGA_API_SERVER_ERROR_ENOENT              : return MEGA_API_ERROR_ENOENT;
-    case MEGA_API_SERVER_ERROR_ECIRCULAR           : return MEGA_API_ERROR_ECIRCULAR;
-    case MEGA_API_SERVER_ERROR_EACCESS             : return MEGA_API_ERROR_EACCESS;
-    case MEGA_API_SERVER_ERROR_EEXIST              : return MEGA_API_ERROR_EEXIST;
-    case MEGA_API_SERVER_ERROR_EINCOMPLETE         : return MEGA_API_ERROR_EINCOMPLETE;
-    case MEGA_API_SERVER_ERROR_EKEY                : return MEGA_API_ERROR_EKEY;
-    case MEGA_API_SERVER_ERROR_ESID                : return MEGA_API_ERROR_ESID;
-    case MEGA_API_SERVER_ERROR_EBLOCKED            : return MEGA_API_ERROR_EBLOCKED;
-    case MEGA_API_SERVER_ERROR_EOVERQUOTA          : return MEGA_API_ERROR_EOVERQUOTA;
-    case MEGA_API_SERVER_ERROR_ETEMPUNAVAIL        : return MEGA_API_ERROR_ETEMPUNAVAIL;
-    case MEGA_API_SERVER_ERROR_ETOOMANYCONNECTIONS : return MEGA_API_ERROR_ETOOMANYCONNECTIONS;
-    default                                        : return MEGA_API_ERROR_OTHER;
+    case MEGA_API_ERROR_EINTERNAL:
+    case MEGA_API_ERROR_EARGS:
+    case MEGA_API_ERROR_EAGAIN:
+    case MEGA_API_ERROR_ERATELIMIT:
+    case MEGA_API_ERROR_EFAILED:
+    case MEGA_API_ERROR_ETOOMANY:
+    case MEGA_API_ERROR_ERANGE:
+    case MEGA_API_ERROR_EEXPIRED:
+    case MEGA_API_ERROR_ENOENT:
+    case MEGA_API_ERROR_ECIRCULAR:
+    case MEGA_API_ERROR_EACCESS:
+    case MEGA_API_ERROR_EEXIST:
+    case MEGA_API_ERROR_EINCOMPLETE:
+    case MEGA_API_ERROR_EKEY:
+    case MEGA_API_ERROR_ESID:
+    case MEGA_API_ERROR_EBLOCKED:
+    case MEGA_API_ERROR_EOVERQUOTA:
+    case MEGA_API_ERROR_ETEMPUNAVAIL:
+    case MEGA_API_ERROR_ETOOMANYCONNECTIONS: 
+      return code;
+    default: 
+      return MEGA_API_ERROR_OTHER;
   }
 }
 
@@ -146,9 +146,7 @@ static gint srv_error_to_api_error(gint code)
  */
 MegaApi* mega_api_new(void)
 {
-  MegaApi *api = g_object_new(MEGA_TYPE_API, NULL);
-
-  return api;
+  return g_object_new(MEGA_TYPE_API, NULL);
 }
 
 static gchar* api_call_single(MegaApi* api, const gchar* request, GError** err)
@@ -183,10 +181,10 @@ static gchar* api_call_single(MegaApi* api, const gchar* request, GError** err)
     if (local_err->domain == MEGA_HTTP_CLIENT_ERROR && local_err->code == MEGA_HTTP_CLIENT_ERROR_CONNECTION_BROKEN)
     {
       if (priv->debug)
-        g_print("<- %d (simulated)\n", MEGA_API_SERVER_ERROR_EAGAIN);
+        g_print("<- %d (simulated)\n", MEGA_API_ERROR_EAGAIN);
 
       // simulate EAGAIN response if server drops connection
-      return g_strdup_printf("%d", MEGA_API_SERVER_ERROR_EAGAIN);
+      return g_strdup_printf("%d", MEGA_API_ERROR_EAGAIN);
     }
     else
     {
@@ -247,7 +245,7 @@ again:
     g_free(response);
 
     // if we have EAGAIN, repeat the call
-    if (error_code == MEGA_API_SERVER_ERROR_EAGAIN)
+    if (error_code == MEGA_API_ERROR_EAGAIN)
     {
       g_usleep(delay);
       delay = delay * 2;
@@ -277,16 +275,7 @@ again:
 }
 
 /**
- * mega_api_call_simple:
- * @api: a #MegaApi
- * @expects: 
- * @error: 
- * @format: 
- * @...: 
- *
- * Description...
- *
- * Returns: 
+ * mega_api_call_simple: (skip)
  */
 gchar* mega_api_call_simple(MegaApi* api, gchar expects, GError** error, const gchar* format, ...)
 {
@@ -367,11 +356,6 @@ err0:
   return NULL;
 }
 
-GQuark mega_api_error_quark(void)
-{
-  return g_quark_from_static_string("mega-api-error-quark");
-}
-
 /**
  * mega_api_get_session_id:
  * @api: a #MegaApi
@@ -390,7 +374,7 @@ const gchar* mega_api_get_session_id(MegaApi* api)
 /**
  * mega_api_set_session_id:
  * @api: a #MegaApi
- * @session_id: 
+ * @session_id: New session ID.
  *
  * Set session ID.
  */
@@ -475,18 +459,11 @@ static void mega_api_init(MegaApi *api)
   api->priv->rid = make_request_id();
 }
 
-static void mega_api_dispose(GObject *object)
-{
-  G_GNUC_UNUSED MegaApi *api = MEGA_API(object);
-
-  // Free everything that may hold reference to MegaApi
-
-  G_OBJECT_CLASS(mega_api_parent_class)->dispose(object);
-}
-
 static void mega_api_finalize(GObject *object)
 {
   MegaApi *api = MEGA_API(object);
+
+  g_clear_object(&api->priv->http);
 
   g_free(api->priv->rid);
   g_free(api->priv->sid);
@@ -503,7 +480,6 @@ static void mega_api_class_init(MegaApiClass *klass)
 
   gobject_class->set_property = mega_api_set_property;
   gobject_class->get_property = mega_api_get_property;
-  gobject_class->dispose = mega_api_dispose;
   gobject_class->finalize = mega_api_finalize;
 
   g_type_class_add_private(klass, sizeof(MegaApiPrivate));
@@ -555,6 +531,11 @@ static void mega_api_class_init(MegaApiClass *klass)
   /* object signals */
 
   /* object signals end */
+}
+
+GQuark mega_api_error_quark(void)
+{
+  return g_quark_from_static_string("mega-api-error-quark");
 }
 
 // }}}
