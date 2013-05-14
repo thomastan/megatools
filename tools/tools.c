@@ -370,7 +370,7 @@ MegaSession* tool_start_session(void)
     if (mega_session_load(session, opt_username, opt_password, &local_err))
     {
       if (opt_cache_timout > 0 && mega_session_is_fresh(session, opt_cache_timout))
-        return session;
+        goto out;
     }
     else
     {
@@ -446,7 +446,7 @@ MegaSession* tool_start_session(void)
   if (mega_filesystem_load(mega_session_get_filesystem(session), &local_err))
   {
     mega_session_save(session, NULL);
-    return session;
+    goto out;
   }
   else
   {
@@ -458,6 +458,21 @@ err:
   g_object_unref(session);
   g_clear_error(&local_err);
   return NULL;
+
+out:
+  if (tool_debug & DEBUG_FS)
+  {
+    gchar* json = mega_filesystem_get_json(mega_session_get_filesystem(session));
+    if (json)
+    {
+      gchar* pretty_json = s_json_pretty(json);
+      g_print("FILESYSTEM: %s\n", pretty_json);
+      g_free(pretty_json);
+      g_free(json);
+    }
+  }
+
+  return session;
 }
 
 void tool_fini(MegaSession* s)

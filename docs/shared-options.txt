@@ -17,7 +17,7 @@ ifndef::mega-no-login[]
 	Never ask interactively for a password
 
 --reload::
-	Reload filesystem cache
+	Don't use cache to load session and filesystem information
 endif::mega-no-login[]
 
 --debug [<options>]::
@@ -27,9 +27,8 @@ endif::mega-no-login[]
 +
 Available options are:
 
-	* `api`: Dump Mega.co.nz API calls
-	* `fs`: Dump Mega.co.nz filesystem (may require `--reload` to actually print something)
-	* `cache`: Dump cache contents
+	* `api`: Dump API calls
+	* `fs`: Dump filesystem info (node list, shared keys, ...)
 
 --version::
 	Show version information
