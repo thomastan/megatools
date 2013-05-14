@@ -67,14 +67,17 @@ gint                    mega_node_error_quark           (void) G_GNUC_CONST;
 
 MegaNode*               mega_node_new                   (MegaFilesystem* filesystem);
 MegaNode*               mega_node_new_contacts          (MegaFilesystem* filesystem);
+
 gboolean                mega_node_load                  (MegaNode* node, const gchar* json, GError** error);
 gboolean                mega_node_load_user             (MegaNode* node, const gchar* json, GError** error);
+
 gboolean                mega_node_is_child              (MegaNode* node, MegaNode* parent);
-gboolean                mega_node_is_toplevel           (MegaNode* node);
 const gchar*            mega_node_get_handle            (MegaNode* node);
 const gchar*            mega_node_get_name              (MegaNode* node);
+
 gchar*                  mega_node_get_json              (MegaNode* node);
 gboolean                mega_node_set_json              (MegaNode* node, const gchar* json);
+
 void                    mega_node_clear                 (MegaNode* node);
 
 G_END_DECLS

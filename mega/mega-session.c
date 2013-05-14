@@ -31,7 +31,6 @@
  *
  * TODO:
  * - Open session for exported folder. 
- * - Load fs nodes, shared keys, build pathmap, path functions
  */
 
 #define CACHE_FORMAT_VERSION 4
@@ -108,9 +107,7 @@ static guint signals[N_SIGNALS];
  */
 MegaSession* mega_session_new(void)
 {
-  MegaSession *session = g_object_new(MEGA_TYPE_SESSION, NULL);
-
-  return session;
+  return g_object_new(MEGA_TYPE_SESSION, NULL);
 }
 
 static gboolean load_user_info(MegaSession* session, GError** error)
@@ -205,9 +202,9 @@ out:
  * @session: a #MegaSession
  * @password: Password
  * @session_id: Session ID
- * @error:
+ * @error: Error.
  *
- * Open existing remote session on the server using session ID.
+ * Open existing session (anonymous or not) using session ID.
  *
  * Returns: TRUE on success.
  */
@@ -248,13 +245,13 @@ gboolean mega_session_open(MegaSession* session, const gchar* password, const gc
 /**
  * mega_session_login:
  * @session: a #MegaSession
- * @username: 
- * @password: 
- * @error: 
+ * @username: E-mail.
+ * @password: Password.
+ * @error: Error.
  *
- * Description...
+ * Login to normal account.
  *
- * Returns: 
+ * Returns: TRUE on success.
  */
 gboolean mega_session_login(MegaSession* session, const gchar* username, const gchar* password, GError** error)
 {
@@ -342,7 +339,7 @@ out:
  * @session: a #MegaSession
  * @user_handle: Ephemeral account user handle.
  * @password: Ephemeral account password.
- * @error: 
+ * @error: Error.
  *
  * Logint to an ephemeral account.
  *
@@ -430,30 +427,12 @@ out:
 }
 
 /**
- * mega_session_logout:
- * @session: a #MegaSession
- * @error: 
- *
- * Description...
- *
- * Returns: 
- */
-gboolean mega_session_logout(MegaSession* session, GError** error)
-{
-  g_return_val_if_fail(MEGA_IS_SESSION(session), FALSE);
-  g_return_val_if_fail(error == NULL || *error == NULL, FALSE);
-
-  g_set_error(error, MEGA_SESSION_ERROR, MEGA_SESSION_ERROR_OTHER, "Logout is not implemented");
-  return FALSE;
-}
-
-/**
  * mega_session_close:
  * @session: a #MegaSession
  *
- * Description...
+ * Close session.
  *
- * Returns:
+ * Returns: TRUE on success.
  */
 gboolean mega_session_close(MegaSession* session)
 {
@@ -500,11 +479,11 @@ static gchar* get_cache_path(const gchar* user_handle)
 /**
  * mega_session_save:
  * @session: a #MegaSession
- * @error: 
+ * @error: Error.
  *
- * Description...
+ * Save session to a file.
  *
- * Returns: 
+ * Returns: TRUE on success.
  */
 gboolean mega_session_save(MegaSession* session, GError** error)
 {
@@ -552,13 +531,13 @@ gboolean mega_session_save(MegaSession* session, GError** error)
 /**
  * mega_session_load:
  * @session: a #MegaSession
- * @username: 
- * @password: 
- * @error: 
+ * @username: E-mail or user handle for anon account.
+ * @password: Password.
+ * @error: Error.
  *
- * Description...
+ * Load session data from a file.
  *
- * Returns: 
+ * Returns: TRUE on success.
  */
 gboolean mega_session_load(MegaSession* session, const gchar* username, const gchar* password, GError** error)
 {
@@ -635,11 +614,11 @@ gboolean mega_session_load(MegaSession* session, const gchar* username, const gc
 /**
  * mega_session_get_info:
  * @session: a #MegaSession
- * @error: 
+ * @error: Error.
  *
- * Description...
+ * Get account information from the server.
  *
- * Returns: 
+ * Returns: JSON object on success.
  */
 gchar* mega_session_get_info(MegaSession* session, GError** error)
 {
@@ -678,6 +657,7 @@ gchar* mega_session_get_info(MegaSession* session, GError** error)
   const gchar* ug = s_json_get_element(response, 5);   // user
 
   SJsonGen *gen = s_json_gen_new();
+
   s_json_gen_start_object(gen);
   s_json_gen_member_build(gen, "user", "%S", s_json_get_member_string(ug, "u"));
   s_json_gen_member_build(gen, "email", "%S", s_json_get_member_string(ug, "email"));
@@ -685,9 +665,26 @@ gchar* mega_session_get_info(MegaSession* session, GError** error)
   s_json_gen_member_build(gen, "master_key", "%S", s_json_get_member_string(ug, "k"));
   s_json_gen_member_build(gen, "public_key", "%S", s_json_get_member_string(ug, "pubk"));
   s_json_gen_member_build(gen, "secret_key", "%S", s_json_get_member_string(ug, "privk"));
+  
   s_json_gen_member_build(gen, "trust_session", "%S", s_json_get_member_string(ug, "ts")); // verify by comparing first 16b with last 16b decrypted by mk
   s_json_gen_member_build(gen, "total_storage", "%i", s_json_get_member_int(uq, "mstrg", -1));
   s_json_gen_member_build(gen, "used_storage", "%i", s_json_get_member_int(uq, "cstrg", -1));
+
+#if 0
+   BWMAN
+     var bwman = true;
+     if (typeof json[0].srvratio == 'undefined') bwman = false;
+bw: Math.round(json[0].mxfer/1024/1024/1024),
+servbw_used: Math.round(json[0].csxfer/1024/1024/1024),
+downbw_used: Math.round(json[0].caxfer/1024/1024/1024),	
+bwman: bwman,
+servbw_limit: json[0].srvratio,
+
+  var servbwperc = Math.round(u.servbw_used / u.bw * 100);  // bandwidth for serving exported files
+  var downbwperc = Math.round(u.downbw_used / u.bw * 100);  // bandwidth for downloading exprote files
+  var stperc = Math.round(u.space_used / u.space * 100);    // space used
+#endif
+
   s_json_gen_member_build(gen, "balance", "%j", s_json_path(uq, ".balance[0][0]!n"));
 
   gint utype = s_json_get_member_int(uq, "utype", 0);
@@ -788,32 +785,17 @@ gchar* mega_session_get_info(MegaSession* session, GError** error)
   s_json_gen_end_object(gen);
   g_free(response);
   return s_json_gen_done(gen);
-
-#if 0
-   BWMAN
-     var bwman = true;
-     if (typeof json[0].srvratio == 'undefined') bwman = false;
-bw: Math.round(json[0].mxfer/1024/1024/1024),
-servbw_used: Math.round(json[0].csxfer/1024/1024/1024),
-downbw_used: Math.round(json[0].caxfer/1024/1024/1024),	
-bwman: bwman,
-servbw_limit: json[0].srvratio,
-
-  var servbwperc = Math.round(u.servbw_used / u.bw * 100);  // bandwidth for serving exported files
-  var downbwperc = Math.round(u.downbw_used / u.bw * 100);  // bandwidth for downloading exprote files
-  var stperc = Math.round(u.space_used / u.space * 100);    // space used
-#endif
 }
 
 /**
  * mega_session_register_anon:
  * @session: a #MegaSession
  * @password: Ephemeral account password.
- * @error: 
+ * @error: Error.
  *
  * Register new ephemeral account, and return its user handle.
  *
- * Returns: User handle.
+ * Returns: User handle on success, or #NULL on failure.
  */
 gchar* mega_session_register_anon(MegaSession* session, const gchar* password, GError** error)
 {
@@ -865,11 +847,11 @@ out:
  * @email: Email (username).
  * @password: Password.
  * @name: Real name.
- * @error: 
+ * @error: Error.
  *
  * Register new account.
  *
- * Returns: Registration state for use in mega_session_register_verify.
+ * Returns: Serialized registration state for use in mega_session_register_verify, or #NULL on failure.
  */
 gchar* mega_session_register(MegaSession* session, const gchar* email, const gchar* password, const gchar* name, GError** error)
 {
@@ -950,9 +932,9 @@ out:
 /**
  * mega_session_register_verify:
  * @session: a #MegaSession
- * @state: Registration state.
+ * @state: Serialized registration state.
  * @signup_key: Signup key.
- * @error: 
+ * @error: Error.
  *
  * Finish registration.
  *
@@ -1202,9 +1184,9 @@ MegaApi* mega_session_get_api(MegaSession* session)
  * mega_session_get_master_key:
  * @session: a #MegaSession
  *
- * Description...
+ * Get master key.
  *
- * Returns: (transfer none):
+ * Returns: (transfer none): AES key.
  */
 MegaAesKey* mega_session_get_master_key(MegaSession* session)
 {
@@ -1217,9 +1199,9 @@ MegaAesKey* mega_session_get_master_key(MegaSession* session)
  * mega_session_get_rsa_key:
  * @session: a #MegaSession
  *
- * Description...
+ * Get RSA key.
  *
- * Returns: (transfer none):
+ * Returns: (transfer none): RSA key.
  */
 MegaRsaKey* mega_session_get_rsa_key(MegaSession* session)
 {
@@ -1232,9 +1214,9 @@ MegaRsaKey* mega_session_get_rsa_key(MegaSession* session)
  * mega_session_get_filesystem:
  * @session: a #MegaSession
  *
- * Description...
+ * Get filesystem.
  *
- * Returns: (transfer none):
+ * Returns: (transfer none): Filesystem.
  */
 MegaFilesystem* mega_session_get_filesystem(MegaSession* session)
 {
@@ -1247,9 +1229,9 @@ MegaFilesystem* mega_session_get_filesystem(MegaSession* session)
  * mega_session_get_user_handle:
  * @session: a #MegaSession
  *
- * Description...
+ * Get user handle.
  *
- * Returns: 
+ * Returns: User handle.
  */
 const gchar* mega_session_get_user_handle(MegaSession* session)
 {
@@ -1262,9 +1244,9 @@ const gchar* mega_session_get_user_handle(MegaSession* session)
  * mega_session_get_json:
  * @session: a #MegaSession
  *
- * Description...
+ * Serialize session into JSON.
  *
- * Returns: 
+ * Returns: JSON string.
  */
 gchar* mega_session_get_json(MegaSession* session)
 {
@@ -1303,11 +1285,11 @@ gchar* mega_session_get_json(MegaSession* session)
 /**
  * mega_session_set_json:
  * @session: a #MegaSession
- * @json: 
+ * @json: JSON string.
  *
- * Description...
+ * Load session data from JSON generated by #mega_session_get_json.
  *
- * Returns: 
+ * Returns: TRUE on success.
  */
 gboolean mega_session_set_json(MegaSession* session, const gchar* json)
 {
@@ -1369,11 +1351,11 @@ gboolean mega_session_set_json(MegaSession* session, const gchar* json)
 /**
  * mega_session_is_fresh:
  * @session: a #MegaSession
- * @max_age: 
+ * @max_age: Maximum age in seconds.
  *
- * Description...
+ * Check if the filesystem and session data are not older than #max_age.
  *
- * Returns: 
+ * Returns: TRUE if session and filesystem is fresh.
  */
 gboolean mega_session_is_fresh(MegaSession* session, gint64 max_age)
 {
@@ -1464,8 +1446,6 @@ static void mega_session_init(MegaSession *session)
   session->priv = G_TYPE_INSTANCE_GET_PRIVATE(session, MEGA_TYPE_SESSION, MegaSessionPrivate);
 
   session->priv->api = mega_api_new();
-  //g_object_set(session->priv->api, "debug", TRUE, NULL);
-
   session->priv->filesystem = mega_filesystem_new(session);
 }
 

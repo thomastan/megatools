@@ -69,8 +69,6 @@ MegaSession*            mega_session_new                (void);
 
 gboolean                mega_session_login              (MegaSession* session, const gchar* username, const gchar* password, GError** error);
 gboolean                mega_session_login_anon         (MegaSession* session, const gchar* user_handle, const gchar* password, GError** error);
-gboolean                mega_session_logout             (MegaSession* session, GError** error);
-
 gboolean                mega_session_open               (MegaSession* session, const gchar* password, const gchar* session_id, GError** error);
 gboolean                mega_session_close              (MegaSession* session);
 

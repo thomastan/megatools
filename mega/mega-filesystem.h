@@ -59,7 +59,7 @@ MegaFilesystem*         mega_filesystem_new             (MegaSession* session);
 void                    mega_filesystem_clear           (MegaFilesystem* filesystem);
 gboolean                mega_filesystem_load            (MegaFilesystem* filesystem, GError** error);
 
-void                    mega_filesystem_add_share_key   (MegaFilesystem* filesystem, const gchar* user_handle, MegaAesKey* key);
+void                    mega_filesystem_add_share_key   (MegaFilesystem* filesystem, const gchar* handle, MegaAesKey* key);
 MegaAesKey*             mega_filesystem_get_share_key   (MegaFilesystem* filesystem, const gchar* handle);
 
 MegaSession*            mega_filesystem_get_session     (MegaFilesystem* filesystem);
