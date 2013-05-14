@@ -11,8 +11,8 @@ libtools_la_SOURCES = \
 
 LDADD = \
   libtools.la \
-  $(GLIB_LIBS) \
-  $(top_builddir)/mega/libmega.la
+  $(top_builddir)/mega/libmega.la \
+  $(GLIB_LIBS)
 
 megafs_LDADD = \
   $(LDADD) \

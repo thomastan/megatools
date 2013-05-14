@@ -41,7 +41,14 @@ GLIB_MAKEFILE='$(top_srcdir)/Makefile.glib'
 AC_SUBST(GLIB_MAKEFILE)
 
 # check gobject-introspection
-GOBJECT_INTROSPECTION_CHECK([$GOBJECT_INTROSPECTION_VERSION])
+AS_IF([test "x$enable_shared" = "xyes"], [
+  GOBJECT_INTROSPECTION_CHECK([$GOBJECT_INTROSPECTION_VERSION])
+], [
+  AM_CONDITIONAL([HAVE_INTROSPECTION], [false])
+])
+
+# check for gmp
+AC_CHECK_LIB(gmp,__gmpz_init,, [AC_MSG_ERROR([GNU MP not found, see http://swox.com/gmp])])
 
 # check nettle
 PKG_CHECK_MODULES(NETTLE, [$NETTLE_REQUIRES])
