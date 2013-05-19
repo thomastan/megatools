@@ -1,43 +1,42 @@
-- annotate/document: MegaHttpClient, MegaChunkedCbcMac, MegaAesCtrEncryptor,
-  MegaHttpInputStream
-
-- MegaApi
-  - cancellable API calls
-
 - megadf:
   - show account subscription info
 
-- streaming download/upload using the new API
-  - MegaFileUploader
+- megals:
+  - filesystem querying (parent, children, filtering, globbing, paths)
+
+- megamkdir:
+  - access rights (read-only/special cases)
+  - node tree/sub-tree sync optimization idea
+  - filesystem manipulation (rename, re-parent, add nodes)
+
+- megamv:
+- megacp:
+- megarm:
+  - implement
+
+- megaget:
+- megadl:
   - MegaFileDownloader
   - progress reporting
+  - resume download in megadl and megaget
 
-- filesystem querying (parent, children, filtering, globbing, paths)
-- filesystem manipulation (rename, re-parent, add nodes)
-- access rights (read-only/special cases)
-- node tree/sub-tree sync optimization idea
-- port tools to a new high-level api
+- megaput:
+  - MegaFileUploader
+  - thumbnails (allow to disable them via config option)
+  - pdf thumbnails taking too much space (renders each page)
 
-- megareg:
-  - present: http://g.static.mega.co.nz/pages/terms.html
-  - interactive prompt for confirmation link
+- megasync
+  - control conflict resolution
+  - delete locally removed files from the cloud
+  - show summary/stats after sync
+  - --watch option
+  - download exported folders
 
 - megafs:
   - file reading/download
   - check that threads are used correctly in megafs
 
-----
-
-Other bugs/issues to solve for the next release:
-
-- thumbnails (allow to disable them via config option)
-- pdf thumbnails taking too much space (renders each page)
-- respect system proxy settings
-- resume download in megadl and megaget
-- expand readme
-  - compilation on old system
-  - how to launch from console
-  - dconf / dbus-launch info in man pages
+- check/respect system proxy settings
 
 
 tests
@@ -52,11 +51,13 @@ libmega
 
 - better randomness on linux (see serious users of nettle api for examples)
 
+- MegaApi
+  - cancellable API calls
+
 
 mega-gjs
 ========
 
-- alter file attributes in mega.js (thumbnails, etc.)
 - show samples of js api on the website
 
 
@@ -65,16 +66,20 @@ tools
 
 - use gnome password manager / some other password manager agent
 
-- megasync
-  - control conflict resolution
-  - delete locally removed files from the cloud
-  - show summary/stats after sync
-  - --watch option
-
 - megashare
   - create shares on folders (and set permissions)
   - export dirs
 
-- megamv /Path1 /Path2 ... /TgtPath
 
-- megacp /Path1 /Path2 ... /TgtPath
+Bin
+===
+
+// Send this urlencoded when uploading chunk: '?c=' + mega_base64urlencode(chksum(ul_sendchunks[p].buffer))
+
+void mega_checksum(const guchar* buffer, gsize len, guchar csum[12])
+{
+  memset(csum, 0, 12);
+
+  while (len--)
+    csum[len % 12] ^= buffer[len];
+}
