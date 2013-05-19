@@ -31,13 +31,36 @@
 #include "mega-node.h"
 #include "private-utils.h"
 
+/*
+ * Filesystem nodes tree
+ * ---------------------
+ *
+ * Filesystem holds a list of all nodes. There are two representations of
+ * relations between nodes: 
+ *
+ *   - Mega.co.nz node handles (handle, parent_handle, su_handle).
+ *   - MegaNode pointers (parent/children)
+ *
+ * These representations may differ, and can be synchronized. This allows
+ * for reorganizations of the tree in memory and sending batch change requests
+ * to the server.
+ *
+ * In order to perform filesystem changes, user would modify the node tree,
+ * and call #mega_filesystem_sync method.
+ */
+
 struct _MegaFilesystemPrivate
 {
-  MegaSession* session;
+  GWeakRef session;
+
+  GList* nodes;
+
+  // optimization for fast access to individual/root nodes
+  GSList* root_nodes;
+  GHashTable* pathmap;
+  GHashTable* handlemap;
 
   GHashTable* share_keys;
-  GSList* nodes;
-  GHashTable* pathmap;
   gint64 last_refresh;
 };
 
@@ -82,14 +105,18 @@ static gboolean handle_auth(const gchar* handle, const gchar* b64_ha, MegaAesKey
   return status;
 }
 
-static void build_pathmap(MegaFilesystem* filesystem, MegaNode* parent, const gchar* base_path)
+static void build_pathmap(MegaFilesystem* filesystem, GList** nodes, MegaNode* parent, const gchar* base_path)
 {
   MegaFilesystemPrivate* priv = filesystem->priv;
-  GSList* i;
+  GList *i, *next, *matched = NULL;
 
-  for (i = priv->nodes; i; i = i->next)
+  if (parent)
+    mega_node_remove_children(parent);
+
+  for (i = *nodes; i; i = next)
   {
     MegaNode* node = i->data;
+    next = i->next;
 
     if (mega_node_is_child(node, parent))
     {
@@ -103,20 +130,52 @@ static void build_pathmap(MegaFilesystem* filesystem, MegaNode* parent, const gc
         path = tmp;
       }
 
-      g_object_set(node, "path", path, NULL);
-      g_hash_table_insert(priv->pathmap, path, g_object_ref(node));
+      if (parent)
+        mega_node_add_child(parent, node);
+      g_object_set(node, "path", path, "parent", parent, NULL);
+      g_hash_table_insert(priv->pathmap, g_strdup(path), g_object_ref(node));
+      
+      *nodes = g_list_remove_link(*nodes, i);
+      matched = g_list_concat(matched, i);
 
-      build_pathmap(filesystem, node, path);
+      g_free(path);
+    }
+
+    // first iteration
+    if (parent == NULL && mega_node_get_handle(node))
+    {
+      g_hash_table_insert(priv->handlemap, g_strdup(mega_node_get_handle(node)), g_object_ref(node));
+
+      if (mega_node_is_child(node, NULL))
+        priv->root_nodes = g_slist_prepend(priv->root_nodes, g_object_ref(node));
     }
   }
+
+  for (i = matched; i; i = i->next)
+    build_pathmap(filesystem, nodes, i->data, mega_node_get_path(i->data));
+
+  g_list_free(matched);
 }
 
-static void update_pathmap(MegaFilesystem* filesystem)
+static void update_maps(MegaFilesystem* filesystem)
 {
+  MegaFilesystemPrivate* priv;
+  GList* nodes;
+
   g_return_if_fail(MEGA_IS_FILESYSTEM(filesystem));
 
-  g_hash_table_remove_all(filesystem->priv->pathmap);
-  build_pathmap(filesystem, NULL, "");
+  priv = filesystem->priv;
+
+  // cleanup first
+  g_hash_table_remove_all(priv->pathmap);
+  g_hash_table_remove_all(priv->handlemap);
+  g_slist_free_full(priv->root_nodes, g_object_unref);
+  priv->root_nodes = NULL;
+
+  // create a working copy of the node list
+  nodes = g_list_copy(priv->nodes);
+  build_pathmap(filesystem, &nodes, NULL, "");
+  g_list_free(nodes);
 }
 
 static gchar* path_sanitize_slashes(const gchar* path)
@@ -226,9 +285,7 @@ static gchar* path_simplify(const gchar* path)
  */
 MegaFilesystem* mega_filesystem_new(MegaSession* session)
 {
-  MegaFilesystem *filesystem = g_object_new(MEGA_TYPE_FILESYSTEM, "session", session, NULL);
-
-  return filesystem;
+  return g_object_new(MEGA_TYPE_FILESYSTEM, "session", session, NULL);
 }
 
 /**
@@ -247,8 +304,9 @@ void mega_filesystem_clear(MegaFilesystem* filesystem)
 
   g_hash_table_remove_all(priv->share_keys);
   g_hash_table_remove_all(priv->pathmap);
+  g_hash_table_remove_all(priv->handlemap);
 
-  g_slist_free_full(priv->nodes, (GDestroyNotify)g_object_unref);
+  g_list_free_full(priv->nodes, (GDestroyNotify)g_object_unref);
   priv->nodes = NULL;
 }
 
@@ -267,18 +325,27 @@ gboolean mega_filesystem_load(MegaFilesystem* filesystem, GError** error)
   MegaAesKey* master_key;
   GError* local_err = NULL;
   gchar* f_node;
-  GSList* list = NULL;
+  GList* list = NULL;
+  MegaSession* session = NULL;
 
   g_return_val_if_fail(MEGA_IS_FILESYSTEM(filesystem), FALSE);
   g_return_val_if_fail(error == NULL || *error == NULL, FALSE);
 
   priv = filesystem->priv;
-  master_key = mega_session_get_master_key(priv->session);
+  session = mega_filesystem_get_session(filesystem);
+  master_key = mega_session_get_master_key(session);
 
-  f_node = mega_api_call_simple(mega_session_get_api(priv->session), 'o', &local_err, "{a:f, c:1}");
+  if (!session || !master_key)
+  {
+    g_clear_object(&session);
+    return FALSE;
+  }
+
+  f_node = mega_api_call_simple(mega_session_get_api(session), 'o', &local_err, "{a:f, c:1}");
   if (!f_node)
   {
     g_propagate_error(error, local_err);
+    g_clear_object(&session);
     return FALSE;
   }
 
@@ -326,7 +393,7 @@ gboolean mega_filesystem_load(MegaFilesystem* filesystem, GError** error)
 
       MegaNode* node = mega_node_new(filesystem);
       if (mega_node_load(node, f, &local_err))
-        list = g_slist_prepend(list, node);
+        list = g_list_prepend(list, node);
       else
       {
         g_printerr("WARNING: Skipping import of node: %s\n", local_err->message ? local_err->message : "?");
@@ -337,7 +404,7 @@ gboolean mega_filesystem_load(MegaFilesystem* filesystem, GError** error)
   }
 
   // import special root node for contacts
-  list = g_slist_prepend(list, mega_node_new_contacts(filesystem));
+  list = g_list_prepend(list, mega_node_new_contacts(filesystem));
 
   // process 'u' array
 
@@ -355,7 +422,7 @@ gboolean mega_filesystem_load(MegaFilesystem* filesystem, GError** error)
 
       MegaNode* node = mega_node_new(filesystem);
       if (mega_node_load_user(node, u, &local_err))
-        list = g_slist_prepend(list, node);
+        list = g_list_prepend(list, node);
       else
       {
         g_printerr("WARNING: Skipping import of node: %s\n", local_err->message ? local_err->message : "?");
@@ -367,13 +434,14 @@ gboolean mega_filesystem_load(MegaFilesystem* filesystem, GError** error)
 
   g_free(f_node);
 
-  g_slist_free_full(priv->nodes, (GDestroyNotify)g_object_unref);
-  priv->nodes = g_slist_reverse(list);
+  g_list_free_full(priv->nodes, (GDestroyNotify)g_object_unref);
+  priv->nodes = g_list_reverse(list);
 
-  update_pathmap(filesystem);
+  update_maps(filesystem);
 
   priv->last_refresh = time(NULL);
 
+  g_clear_object(&session);
   return TRUE;
 }
 
@@ -425,13 +493,13 @@ MegaAesKey* mega_filesystem_get_share_key(MegaFilesystem* filesystem, const gcha
  *
  * Get session associated with the filesystem.
  *
- * Returns: (transfer none): Session.
+ * Returns: (transfer full): Session.
  */
 MegaSession* mega_filesystem_get_session(MegaFilesystem* filesystem)
 {
   g_return_val_if_fail(MEGA_IS_FILESYSTEM(filesystem), NULL);
 
-  return filesystem->priv->session;
+  return g_weak_ref_get(&filesystem->priv->session);
 }
 
 static void share_key_to_json(gchar* handle, MegaAesKey* key, SJsonGen* gen)
@@ -472,7 +540,7 @@ gchar* mega_filesystem_get_json(MegaFilesystem* filesystem)
   s_json_gen_end_array(gen);
 
   s_json_gen_member_array(gen, "nodes");
-  g_slist_foreach(priv->nodes, (GFunc)node_to_json, gen);
+  g_list_foreach(priv->nodes, (GFunc)node_to_json, gen);
   s_json_gen_end_array(gen);
 
   s_json_gen_member_int(gen, "last_refresh", priv->last_refresh);
@@ -527,16 +595,16 @@ gboolean mega_filesystem_set_json(MegaFilesystem* filesystem, const gchar* json)
     MegaNode* node = mega_node_new(filesystem);
 
     if (mega_node_set_json(node, n))
-      priv->nodes = g_slist_prepend(priv->nodes, node);
+      priv->nodes = g_list_prepend(priv->nodes, node);
     else
       g_object_unref(node);
   S_JSON_FOREACH_END()
 
-  priv->nodes = g_slist_reverse(priv->nodes);
+  priv->nodes = g_list_reverse(priv->nodes);
 
   priv->last_refresh = s_json_get_member_int(json, "last_refresh", 0);
 
-  update_pathmap(filesystem);
+  update_maps(filesystem);
 
   return TRUE;
 }
@@ -562,6 +630,188 @@ gboolean mega_filesystem_is_fresh(MegaFilesystem* filesystem, gint64 max_age)
   return priv->last_refresh > 0 && (priv->last_refresh + max_age) >= time(NULL);
 }
 
+struct FilterData
+{
+  GSList* result;
+  MegaNodeFilter filter;
+  gpointer user_data;
+};
+
+static void filter_iter(MegaNode* node, struct FilterData* data)
+{
+  if (data->filter == NULL || data->filter(node, data->user_data))
+    data->result = g_slist_prepend(data->result, g_object_ref(node));
+}
+
+/**
+ * mega_filesystem_filter_nodes:
+ * @filesystem: a #MegaFilesystem
+ * @filter: (closure user_data) (scope call) (allow-none): Function that takes MegaNode and #user_data,
+ * and should return #TRUE to include node to the returned result set.
+ * @user_data: Arbitrary data to be passed to the filter function.
+ *
+ * Get list of nodes matching a filter.
+ *
+ * Returns: (transfer full) (element-type MegaNode): List of nodes.
+ */
+GSList* mega_filesystem_filter_nodes(MegaFilesystem* filesystem, MegaNodeFilter filter, gpointer user_data)
+{
+  MegaFilesystemPrivate* priv;
+  struct FilterData iter_data;
+
+  g_return_val_if_fail(MEGA_IS_FILESYSTEM(filesystem), NULL);
+
+  priv = filesystem->priv;
+
+  iter_data.filter = filter;
+  iter_data.user_data = user_data;
+  iter_data.result = NULL;
+
+  g_list_foreach(priv->nodes, (GFunc)filter_iter, &iter_data);
+
+  return g_slist_reverse(iter_data.result);
+}
+
+/**
+ * mega_filesystem_get_node_by_path:
+ * @filesystem: a #MegaFilesystem
+ * @path: Node path.
+ *
+ * Get node by path.
+ *
+ * Returns: (transfer none): a #MegaNode
+ */
+MegaNode* mega_filesystem_get_node_by_path(MegaFilesystem* filesystem, const gchar* path)
+{
+  MegaFilesystemPrivate* priv;
+
+  g_return_val_if_fail(MEGA_IS_FILESYSTEM(filesystem), NULL);
+  g_return_val_if_fail(path != NULL, NULL);
+
+  priv = filesystem->priv;
+
+  return g_hash_table_lookup(priv->pathmap, path);
+}
+
+/**
+ * mega_filesystem_get_node:
+ * @filesystem: a #MegaFilesystem
+ * @handle: Node handle.
+ *
+ * Get node by handle.
+ *
+ * Returns: (transfer none): a #MegaNode
+ */
+MegaNode* mega_filesystem_get_node(MegaFilesystem* filesystem, const gchar* handle)
+{
+  MegaFilesystemPrivate* priv;
+
+  g_return_val_if_fail(MEGA_IS_FILESYSTEM(filesystem), NULL);
+  g_return_val_if_fail(handle != NULL, NULL);
+
+  priv = filesystem->priv;
+
+  return g_hash_table_lookup(priv->handlemap, handle);
+}
+
+/**
+ * mega_filesystem_glob:
+ * @filesystem: a #MegaFilesystem
+ * @glob: A glob pattern
+ *
+ * Get list of nodes matching glob pattern.
+ *
+ * Returns: (transfer full) (element-type MegaNode): List of nodes.
+ */
+GSList* mega_filesystem_glob(MegaFilesystem* filesystem, const gchar* glob)
+{
+  gchar** glob_parts;
+  GPtrArray* parts;
+  gint i;
+
+  g_return_val_if_fail(MEGA_IS_FILESYSTEM(filesystem), NULL);
+  g_return_val_if_fail(glob != NULL, NULL);
+
+  // skip relative glob paterns
+  glob_parts = g_regex_split_simple("/+", glob, 0, G_REGEX_MATCH_NOTEMPTY);
+  if (glob_parts == NULL || glob_parts[0][0] != '\0')
+    return NULL;
+
+  // preprocess glob patern (.. and .)
+  parts = g_ptr_array_sized_new(g_strv_length(glob_parts));
+  for (i = 1; glob_parts[i]; i++)  
+  {
+    if (!strcmp(glob_parts[i], ".."))
+    {
+      if (parts->len > 0)
+        g_ptr_array_remove_index(parts, parts->len - 1);
+    }
+    else if (strcmp(glob_parts[i], ".") && strcmp(glob_parts[i], ""))
+      g_ptr_array_add(parts, glob_parts[i]);
+  }
+
+  // create list of root nodes filtered by pattern
+  GSList *full_list = NULL, *filtered_list = NULL, *iter;
+  for (i = 0; i < parts->len; i++)  
+  {
+    gchar* pattern = g_ptr_array_index(parts, i);
+
+    // create list of nodes for filtering
+    g_slist_free_full(full_list, g_object_unref);
+    if (i == 0)
+    {
+      full_list = mega_filesystem_get_root_nodes(filesystem);
+    }
+    else
+    {
+      full_list = NULL;
+      for (iter = filtered_list; iter; iter = iter->next)
+      {
+        MegaNode* node = iter->data;
+
+        full_list = g_slist_concat(full_list, mega_node_get_children(node));
+      }
+    }
+
+    // clear fitlered list
+    g_slist_free_full(filtered_list, g_object_unref);
+    filtered_list = NULL;
+
+    for (iter = full_list; iter; iter = iter->next)
+    {
+      MegaNode* node = iter->data;
+
+      if (g_pattern_match_simple(pattern, mega_node_get_name(node)))
+        filtered_list = g_slist_prepend(filtered_list, g_object_ref(node));
+    }
+  }
+
+  g_slist_free_full(full_list, g_object_unref);
+  g_strfreev(glob_parts);
+  g_ptr_array_unref(parts);
+
+  return g_slist_reverse(filtered_list);
+}
+
+/**
+ * mega_filesystem_get_root_nodes:
+ * @filesystem: a #MegaFilesystem
+ *
+ * Get filesystem root nodes.
+ *
+ * Returns: (transfer full) (element-type MegaNode): List of nodes.
+ */
+GSList* mega_filesystem_get_root_nodes(MegaFilesystem* filesystem)
+{
+  MegaFilesystemPrivate* priv;
+
+  g_return_val_if_fail(MEGA_IS_FILESYSTEM(filesystem), NULL);
+
+  priv = filesystem->priv;
+
+  return g_slist_copy_deep(priv->root_nodes, (GCopyFunc)g_object_ref, NULL);
+}
+
 // {{{ GObject type setup
 
 static void mega_filesystem_set_property(GObject *object, guint property_id, const GValue *value, GParamSpec *pspec)
@@ -572,8 +822,7 @@ static void mega_filesystem_set_property(GObject *object, guint property_id, con
   switch (property_id)
   {
     case PROP_SESSION:
-      g_clear_object(&priv->session);
-      priv->session = g_value_dup_object(value);
+      g_weak_ref_set(&priv->session, g_value_get_object(value));
       break;
 
     default:
@@ -589,7 +838,7 @@ static void mega_filesystem_get_property(GObject *object, guint property_id, GVa
   switch (property_id)
   {
     case PROP_SESSION:
-      g_value_set_object(value, priv->session);
+      g_value_take_object(value, g_weak_ref_get(&priv->session));
       break;
 
     default:
@@ -604,16 +853,19 @@ static void mega_filesystem_init(MegaFilesystem *filesystem)
   filesystem->priv = G_TYPE_INSTANCE_GET_PRIVATE(filesystem, MEGA_TYPE_FILESYSTEM, MegaFilesystemPrivate);
 
   filesystem->priv->pathmap = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_object_unref);
+  filesystem->priv->handlemap = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_object_unref);
   filesystem->priv->share_keys = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_object_unref);
+
+  filesystem->priv->nodes = NULL;
+  filesystem->priv->root_nodes = NULL;
+
+  g_weak_ref_init(&filesystem->priv->session, NULL);
 }
 
 static void mega_filesystem_dispose(GObject *object)
 {
   MegaFilesystem *filesystem = MEGA_FILESYSTEM(object);
   MegaFilesystemPrivate* priv = filesystem->priv;
-
-  g_clear_object(&priv->session);
-  g_hash_table_remove_all(priv->pathmap);
 
   G_OBJECT_CLASS(mega_filesystem_parent_class)->dispose(object);
 }
@@ -623,11 +875,17 @@ static void mega_filesystem_finalize(GObject *object)
   MegaFilesystem *filesystem = MEGA_FILESYSTEM(object);
   MegaFilesystemPrivate* priv = filesystem->priv;
 
-  g_slist_free_full(priv->nodes, (GDestroyNotify)g_object_unref);
+  g_list_free_full(priv->nodes, (GDestroyNotify)g_object_unref);
   priv->nodes = NULL;
 
+  g_slist_free_full(priv->root_nodes, (GDestroyNotify)g_object_unref);
+  priv->root_nodes = NULL;
+
   g_hash_table_destroy(priv->pathmap);
+  g_hash_table_destroy(priv->handlemap);
   g_hash_table_destroy(priv->share_keys);
+
+  g_weak_ref_clear(&priv->session);
 
   G_OBJECT_CLASS(mega_filesystem_parent_class)->finalize(object);
 }

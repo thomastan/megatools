@@ -33,7 +33,9 @@
 
 struct _MegaNodePrivate
 {
-  MegaFilesystem* filesystem;
+  GWeakRef filesystem;
+  GWeakRef parent;
+  GList* children;
 
   gchar* name;
   gchar* handle;
@@ -55,6 +57,7 @@ enum MegaNodeProp
 {
   PROP_0,
   PROP_FILESYSTEM,
+  PROP_PARENT,
   PROP_NAME,
   PROP_HANDLE,
   PROP_PARENT_HANDLE,
@@ -130,16 +133,30 @@ static gboolean decrypt_node_attrs(const gchar* encrypted_attrs, MegaAesKey* key
 
 static MegaRsaKey* get_session_rsa_key(MegaNode* node)
 {
-  g_return_val_if_fail(MEGA_IS_NODE(node), NULL);
+  MegaRsaKey* key = NULL; 
+  MegaSession* session = mega_node_get_session(node);
 
-  return mega_session_get_rsa_key(mega_filesystem_get_session(node->priv->filesystem));
+  if (session)
+  {
+    key = g_object_ref(mega_session_get_rsa_key(session));
+    g_object_unref(session);
+  }
+
+  return key;
 }
 
 static MegaAesKey* get_session_master_key(MegaNode* node)
 {
-  g_return_val_if_fail(MEGA_IS_NODE(node), NULL);
+  MegaAesKey* key = NULL; 
+  MegaSession* session = mega_node_get_session(node);
 
-  return mega_session_get_master_key(mega_filesystem_get_session(node->priv->filesystem));
+  if (session)
+  {
+    key = g_object_ref(mega_session_get_master_key(session));
+    g_object_unref(session);
+  }
+
+  return key;
 }
 
 /**
@@ -177,9 +194,12 @@ MegaNode* mega_node_new_contacts(MegaFilesystem* filesystem)
 static MegaAesKey* decrypt_node_key(MegaNode* node, const gchar* k, GError** error)
 {
   MegaNodePrivate* priv;
-  const gchar* user_handle;
+  MegaAesKey* node_key = NULL;
+  MegaSession* session = NULL;
+  MegaFilesystem* filesystem = NULL;
   MegaAesKey* key = NULL;
   gchar* encrypted_node_key = NULL;
+  const gchar* user_handle;
   gchar** parts;
   gint i;
 
@@ -188,7 +208,13 @@ static MegaAesKey* decrypt_node_key(MegaNode* node, const gchar* k, GError** err
   g_return_val_if_fail(error == NULL || *error == NULL, NULL);
 
   priv = node->priv;
-  user_handle = mega_session_get_user_handle(mega_filesystem_get_session(priv->filesystem));
+
+  session = mega_node_get_session(node);
+  user_handle = mega_session_get_user_handle(session);
+  filesystem = g_weak_ref_get(&priv->filesystem);
+
+  if (!session || !filesystem)
+    goto out;
 
   // parse k = 'handle1:key1/handle2:key2/...' and find suitable decryption key
 
@@ -211,11 +237,14 @@ static MegaAesKey* decrypt_node_key(MegaNode* node, const gchar* k, GError** err
         break;
       }
 
-      key = mega_filesystem_get_share_key(priv->filesystem, key_handle);
-      if (key)
+      if (filesystem)
       {
-        encrypted_node_key = g_strdup(key_value);
-        break;
+        key = g_object_ref(mega_filesystem_get_share_key(filesystem, key_handle));
+        if (key)
+        {
+          encrypted_node_key = g_strdup(key_value);
+          break;
+        }
       }
     }
   }
@@ -227,7 +256,7 @@ static MegaAesKey* decrypt_node_key(MegaNode* node, const gchar* k, GError** err
   if (!encrypted_node_key)
   {
     g_set_error(error, MEGA_NODE_ERROR, MEGA_NODE_ERROR_OTHER, "Decryption key for node key not found");
-    return NULL;
+    goto out;
   }
 
   // keys longer than 45 chars are RSA keys, skip
@@ -235,39 +264,38 @@ static MegaAesKey* decrypt_node_key(MegaNode* node, const gchar* k, GError** err
   if (strlen(encrypted_node_key) >= 46)
   {
     g_set_error(error, MEGA_NODE_ERROR, MEGA_NODE_ERROR_OTHER, "RSA node key not supported");
-    goto err;
+    goto out;
   }
 
   if (priv->type == MEGA_NODE_TYPE_FILE)
   {
-    MegaFileKey* node_key = mega_file_key_new();
-    if (!mega_file_key_load_enc_ubase64(node_key, encrypted_node_key, key))
+    node_key = MEGA_AES_KEY(mega_file_key_new());
+
+    if (!mega_file_key_load_enc_ubase64(MEGA_FILE_KEY(node_key), encrypted_node_key, key))
     {
       g_set_error(error, MEGA_NODE_ERROR, MEGA_NODE_ERROR_OTHER, "Can't decrypt file key");
-      g_object_unref(node_key);
-      goto err;
+      g_clear_object(&node_key);
+      goto out;
     }
-    
-    g_free(encrypted_node_key);
-    return MEGA_AES_KEY(node_key);
   }
   else
   {
-    MegaAesKey* node_key = mega_aes_key_new_from_enc_ubase64(encrypted_node_key, key);
+    node_key = mega_aes_key_new_from_enc_ubase64(encrypted_node_key, key);
+
     if (!mega_aes_key_is_loaded(node_key))
     {
       g_set_error(error, MEGA_NODE_ERROR, MEGA_NODE_ERROR_OTHER, "Can't decrypt folder key");
-      g_object_unref(node_key);
-      goto err;
+      g_clear_object(&node_key);
+      goto out;
     }
-
-    g_free(encrypted_node_key);
-    return node_key;
   }
 
-err:
+out:
   g_free(encrypted_node_key);
-  return NULL;
+  g_clear_object(&session);
+  g_clear_object(&filesystem);
+  g_clear_object(&key);
+  return node_key;
 }
 
 /**
@@ -328,14 +356,24 @@ gboolean mega_node_load(MegaNode* node, const gchar* json, GError** error)
     GBytes* share_key;
 
     if (strlen(sk) > 22)
-      share_key = mega_rsa_key_decrypt(get_session_rsa_key(node), sk);
+    {
+      MegaRsaKey* key = get_session_rsa_key(node);
+      share_key = mega_rsa_key_decrypt(key, sk);
+      g_object_unref(key);
+    }
     else
-      share_key = mega_aes_key_decrypt(get_session_master_key(node), sk);
+    {
+      MegaAesKey* key = get_session_master_key(node);
+      share_key = mega_aes_key_decrypt(key, sk);
+      g_object_unref(key);
+    }
 
     if (share_key && g_bytes_get_size(share_key) >= 16)
     {
       MegaAesKey* aes_share_key = mega_aes_key_new_from_binary(g_bytes_get_data(share_key, NULL));
-      mega_filesystem_add_share_key(priv->filesystem, priv->handle, aes_share_key);
+      MegaFilesystem* filesystem = g_weak_ref_get(&priv->filesystem);
+      mega_filesystem_add_share_key(filesystem, priv->handle, aes_share_key);
+      g_object_unref(filesystem);
       g_object_unref(aes_share_key);
     }
 
@@ -528,6 +566,21 @@ const gchar* mega_node_get_name(MegaNode* node)
   return node->priv->name;
 }
 
+/**
+ * mega_node_get_path:
+ * @node: a #MegaNode
+ *
+ * Get node path.
+ *
+ * Returns: Node path.
+ */
+const gchar* mega_node_get_path(MegaNode* node)
+{
+  g_return_val_if_fail(MEGA_IS_NODE(node), NULL);
+
+  return node->priv->path;
+}
+
 #if 0
 gboolean mega_node_is_writable(mega_session* s, mega_node* n)
 {
@@ -676,6 +729,156 @@ void mega_node_clear(MegaNode* node)
   g_clear_object(&priv->key);
 }
 
+/**
+ * mega_node_get_session:
+ * @node: a #MegaNode
+ *
+ * Get session associated with this node.
+ *
+ * Returns: (transfer full): Session.
+ */
+MegaSession* mega_node_get_session(MegaNode* node)
+{
+  MegaNodePrivate* priv;
+  MegaFilesystem* filesystem;
+  MegaSession* session = NULL;
+
+  g_return_val_if_fail(MEGA_IS_NODE(node), NULL);
+
+  priv = node->priv;
+
+  filesystem = g_weak_ref_get(&priv->filesystem);
+  if (filesystem)
+  {
+    session = mega_filesystem_get_session(filesystem);
+    g_object_unref(filesystem);
+  }
+
+  return session;
+}
+
+/**
+ * mega_node_add_child:
+ * @node: a #MegaNode
+ * @child: A new child.
+ *
+ * Add child to this node.
+ */
+void mega_node_add_child(MegaNode* node, MegaNode* child)
+{
+  MegaNodePrivate* priv;
+  MegaNode* old_parent = NULL;
+
+  g_return_val_if_fail(MEGA_IS_NODE(node), FALSE);
+  g_return_val_if_fail(MEGA_IS_NODE(child), FALSE);
+
+  priv = node->priv;
+
+  priv->children = g_list_append(priv->children, g_object_ref(child));
+
+  old_parent = mega_node_get_parent(child);
+  if (old_parent)
+  {
+    mega_node_remove_child(old_parent, child);
+    g_object_unref(old_parent);
+  }
+
+  g_weak_ref_set(&child->priv->parent, node);
+}
+
+static void clear_parent_ref(MegaNode* node)
+{
+  g_return_if_fail(MEGA_IS_NODE(node));
+
+  g_weak_ref_set(&node->priv->parent, NULL);
+}
+
+/**
+ * mega_node_remove_child:
+ * @node: a #MegaNode
+ * @child: Removed child.
+ *
+ * Remove child of this node.
+ */
+void mega_node_remove_child(MegaNode* node, MegaNode* child)
+{
+  MegaNodePrivate* priv;
+
+  g_return_if_fail(MEGA_IS_NODE(node));
+  g_return_if_fail(MEGA_IS_NODE(child));
+
+  priv = node->priv;
+
+  priv->children = g_list_remove(priv->children, child);
+  clear_parent_ref(child);
+}
+
+/**
+ * mega_node_remove_children:
+ * @node: a #MegaNode
+ *
+ * Remove all children of this node.
+ */
+void mega_node_remove_children(MegaNode* node)
+{
+  MegaNodePrivate* priv;
+
+  g_return_if_fail(MEGA_IS_NODE(node));
+
+  priv = node->priv;
+
+  g_list_foreach(priv->children, (GFunc)clear_parent_ref, NULL);
+  g_list_free_full(priv->children, (GDestroyNotify)g_object_unref);
+  priv->children = NULL;
+}
+
+/**
+ * mega_node_get_children:
+ * @node: a #MegaNode
+ *
+ * Get list of child nodes of this node.
+ *
+ * Returns: (transfer full) (element-type MegaNode): List of child nodes.
+ */
+GSList* mega_node_get_children(MegaNode* node)
+{
+  MegaNodePrivate* priv;
+  GList* iter;
+  GSList* result = NULL;
+
+  g_return_val_if_fail(MEGA_IS_NODE(node), NULL);
+
+  priv = node->priv;
+
+  for (iter = priv->children; iter; iter = iter->next)
+  {
+    MegaNode* child = iter->data;
+
+    result = g_slist_prepend(result, g_object_ref(child));
+  }
+
+  return g_slist_reverse(result);
+}
+
+/**
+ * mega_node_get_parent:
+ * @node: a #MegaNode
+ *
+ * Get parent node.
+ *
+ * Returns: (transfer full): Parent node or #NULL.
+ */
+MegaNode* mega_node_get_parent(MegaNode* node)
+{
+  MegaNodePrivate* priv;
+
+  g_return_val_if_fail(MEGA_IS_NODE(node), NULL);
+
+  priv = node->priv;
+
+  return g_weak_ref_get(&priv->parent);
+}
+
 // {{{ GObject type setup
 
 static void mega_node_set_property(GObject *object, guint property_id, const GValue *value, GParamSpec *pspec)
@@ -686,8 +889,11 @@ static void mega_node_set_property(GObject *object, guint property_id, const GVa
   switch (property_id)
   {
     case PROP_FILESYSTEM:
-      g_clear_object(&priv->filesystem);
-      priv->filesystem = g_value_dup_object(value);
+      g_weak_ref_set(&priv->filesystem, g_value_get_object(value));
+      break;
+
+    case PROP_PARENT:
+      g_weak_ref_set(&priv->parent, g_value_get_object(value));
       break;
 
     case PROP_NAME:
@@ -755,7 +961,11 @@ static void mega_node_get_property(GObject *object, guint property_id, GValue *v
   switch (property_id)
   {
     case PROP_FILESYSTEM:
-      g_value_set_object(value, priv->filesystem);
+      g_value_take_object(value, g_weak_ref_get(&priv->filesystem));
+      break;
+
+    case PROP_PARENT:
+      g_value_take_object(value, g_weak_ref_get(&priv->parent));
       break;
 
     case PROP_NAME:
@@ -812,14 +1022,15 @@ G_DEFINE_TYPE(MegaNode, mega_node, G_TYPE_OBJECT);
 static void mega_node_init(MegaNode *node)
 {
   node->priv = G_TYPE_INSTANCE_GET_PRIVATE(node, MEGA_TYPE_NODE, MegaNodePrivate);
+
+  g_weak_ref_init(&node->priv->filesystem, NULL);
+  g_weak_ref_init(&node->priv->parent, NULL);
 }
 
 static void mega_node_dispose(GObject *object)
 {
   MegaNode *node = MEGA_NODE(object);
   MegaNodePrivate* priv = node->priv;
-
-  g_clear_object(&priv->filesystem);
 
   G_OBJECT_CLASS(mega_node_parent_class)->dispose(object);
 }
@@ -829,6 +1040,10 @@ static void mega_node_finalize(GObject *object)
   MegaNode *node = MEGA_NODE(object);
   MegaNodePrivate* priv = node->priv;
 
+  mega_node_remove_children(node);
+
+  g_weak_ref_clear(&priv->filesystem);
+  g_weak_ref_clear(&priv->parent);
   g_clear_pointer(&priv->name, g_free);
   g_clear_pointer(&priv->handle, g_free);
   g_clear_pointer(&priv->parent_handle, g_free);
@@ -864,6 +1079,16 @@ static void mega_node_class_init(MegaNodeClass *klass)
   );
 
   g_object_class_install_property(gobject_class, PROP_FILESYSTEM, param_spec);
+
+  param_spec = g_param_spec_object(
+    /* name    */ "parent",
+    /* nick    */ "Parent node",
+    /* blurb   */ "Get parent node",
+    /* is_type */ MEGA_TYPE_NODE,
+    /* flags   */ G_PARAM_READWRITE | G_PARAM_CONSTRUCT
+  );
+
+  g_object_class_install_property(gobject_class, PROP_PARENT, param_spec);
 
   param_spec = g_param_spec_string(
     /* name    */ "name",

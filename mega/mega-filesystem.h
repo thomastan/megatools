@@ -50,6 +50,8 @@ typedef enum
   MEGA_FILESYSTEM_ERROR_OTHER
 } MegaFilesystemError;
 
+typedef gboolean        (*MegaNodeFilter)               (MegaNode* node, gpointer user_data);
+
 G_BEGIN_DECLS
 
 GType                   mega_filesystem_get_type        (void) G_GNUC_CONST;
@@ -67,6 +69,12 @@ MegaSession*            mega_filesystem_get_session     (MegaFilesystem* filesys
 gchar*                  mega_filesystem_get_json        (MegaFilesystem* filesystem);
 gboolean                mega_filesystem_set_json        (MegaFilesystem* filesystem, const gchar* json);
 gboolean                mega_filesystem_is_fresh        (MegaFilesystem* filesystem, gint64 max_age);
+
+GSList*                 mega_filesystem_filter_nodes    (MegaFilesystem* filesystem, MegaNodeFilter filter, gpointer user_data);
+MegaNode*               mega_filesystem_get_node_by_path(MegaFilesystem* filesystem, const gchar* path);
+MegaNode*               mega_filesystem_get_node        (MegaFilesystem* filesystem, const gchar* handle);
+GSList*                 mega_filesystem_glob            (MegaFilesystem* filesystem, const gchar* glob);
+GSList*                 mega_filesystem_get_root_nodes  (MegaFilesystem* filesystem);
 
 G_END_DECLS
 

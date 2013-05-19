@@ -74,11 +74,19 @@ gboolean                mega_node_load_user             (MegaNode* node, const g
 gboolean                mega_node_is_child              (MegaNode* node, MegaNode* parent);
 const gchar*            mega_node_get_handle            (MegaNode* node);
 const gchar*            mega_node_get_name              (MegaNode* node);
+const gchar*            mega_node_get_path              (MegaNode* node);
 
 gchar*                  mega_node_get_json              (MegaNode* node);
 gboolean                mega_node_set_json              (MegaNode* node, const gchar* json);
 
 void                    mega_node_clear                 (MegaNode* node);
+MegaSession*            mega_node_get_session           (MegaNode* node);
+
+void                    mega_node_add_child             (MegaNode* node, MegaNode* child);
+void                    mega_node_remove_child          (MegaNode* node, MegaNode* child);
+void                    mega_node_remove_children       (MegaNode* node);
+GSList*                 mega_node_get_children          (MegaNode* node);
+MegaNode*               mega_node_get_parent            (MegaNode* node);
 
 G_END_DECLS
 
