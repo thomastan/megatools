@@ -617,6 +617,7 @@ GBytes* mega_aes_key_decrypt_cbc(MegaAesKey* aes_key, const gchar* cipher)
 gchar* mega_aes_key_encrypt_string_cbc(MegaAesKey* aes_key, const gchar* str)
 {
   gsize len = 0;
+  gsize len_padded;
   gchar* plain;
   gchar* cipher;
 
@@ -624,13 +625,13 @@ gchar* mega_aes_key_encrypt_string_cbc(MegaAesKey* aes_key, const gchar* str)
   g_return_val_if_fail(str != NULL, NULL);
 
   // calculate paded size
-  len = strlen(str) + 1;
+  len = len_padded = strlen(str) + 1;
   if (len % AES_BLOCK_SIZE)
-    len += AES_BLOCK_SIZE - (len % AES_BLOCK_SIZE);
+    len_padded += AES_BLOCK_SIZE - (len % AES_BLOCK_SIZE);
 
-  plain = g_malloc0(len);
-  memcpy(plain, str, len - 1);
-  cipher = mega_aes_key_encrypt_cbc(aes_key, plain, len);
+  plain = g_malloc0(len_padded);
+  memcpy(plain, str, len);
+  cipher = mega_aes_key_encrypt_cbc(aes_key, plain, len_padded);
   g_free(plain);
 
   return cipher;
