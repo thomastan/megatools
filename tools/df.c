@@ -49,12 +49,29 @@ static gchar* format_size(gint64 size)
   return g_strdup_printf("%" G_GINT64_FORMAT, size);
 }
 
+static void print_line(const gchar* label, const gchar* str)
+{
+  g_print("%-24s%s\n", label, str);
+}
+
+static void print_json(const gchar* json, const gchar* label, const gchar* path)
+{
+  const gchar* el = s_json_path(json, path);
+  if (el)
+  {
+    gchar* str = s_json_get_string(el);
+    if (str)
+      print_line(label, str);
+    g_free(str);
+  }
+}
+
 int main(int ac, char* av[])
 {
   GError *local_err = NULL;
   MegaSession* s;
 
-  tool_init(&ac, &av, "- display mega.co.nz storage quotas/usage", entries);
+  tool_init(&ac, &av, "- display mega.co.nz storage information", entries);
 
   if (opt_total || opt_free || opt_used)
   {
@@ -108,16 +125,17 @@ int main(int ac, char* av[])
     g_print("%s\n", format_size(free));
   else
   {
-    gchar* type = s_json_get_member_string(info, "user_type");
-    if (type)
-      g_print("User type: %s\n", type);
-    g_free(type);
-
-    // XXX: subscription info
-
-    g_print("Total:     %s\n", format_size(total));
-    g_print("Used:      %s\n", format_size(used));
-    g_print("Free:      %s\n", format_size(free));
+    print_json(info, "User handle:",         ".user!s");
+    print_json(info, "User email:",          ".email!s");
+    print_json(info, "User name:",           ".name!s");
+    print_json(info, "User type:",           ".user_type!s");
+    print_json(info, "Subscpription type:",  ".subscription_type!s");
+    print_json(info, "Subscpription cycle:", ".subscription_cycle!s");
+    print_json(info, "Next payment:",        ".subscription_next_payment!s");
+    print_json(info, "Subscribed until:",    ".subscription_until!s");
+    print_line(      "Total:",               format_size(total));
+    print_line(      "Used:",                format_size(used));
+    print_line(      "Free:",                format_size(free));
   }
 
   g_free(info);

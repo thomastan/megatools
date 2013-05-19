@@ -662,6 +662,7 @@ gchar* mega_session_get_info(MegaSession* session, GError** error)
   s_json_gen_member_build(gen, "user", "%S", s_json_get_member_string(ug, "u"));
   s_json_gen_member_build(gen, "email", "%S", s_json_get_member_string(ug, "email"));
   s_json_gen_member_build(gen, "name", "%S", s_json_get_member_string(ug, "name"));
+  s_json_gen_member_build(gen, "confirmed", "%b", s_json_get_member_int(ug, "c", 0) == 1);
   s_json_gen_member_build(gen, "master_key", "%S", s_json_get_member_string(ug, "k"));
   s_json_gen_member_build(gen, "public_key", "%S", s_json_get_member_string(ug, "pubk"));
   s_json_gen_member_build(gen, "secret_key", "%S", s_json_get_member_string(ug, "privk"));
@@ -708,33 +709,30 @@ servbw_limit: json[0].srvratio,
 
     if (stype)
     {
-      gchar* st = s_json_get_string(stype);
-
-      if (!strcmp(st, "S"))
+      if (s_json_string_match(stype, "S"))
       {
         s_json_gen_member_string(gen, "subscription_type", "Subscription");
         if (scycle && snext)
         {
-          gchar* cycle = s_json_get_string(scycle);
           gint64 next = s_json_get_int(snext, 0);
           GDateTime* dt = g_date_time_new_from_unix_local(next);
 
-          if (!strcmp(cycle, "W"))
+          if (s_json_string_match(scycle, "W"))
             s_json_gen_member_string(gen, "subscription_cycle", "Weekly");
-          else if (!strcmp(cycle, "M"))
+          else if (s_json_string_match(scycle, "M"))
             s_json_gen_member_string(gen, "subscription_cycle", "Monthly");
-          else if (!strcmp(cycle, "Y"))
+          else if (s_json_string_match(scycle, "Y"))
             s_json_gen_member_string(gen, "subscription_cycle", "Yearly");
 
           if (next)
             s_json_gen_member_build(gen, "subscription_next_payment", "%S", g_date_time_format(dt, "%F"));
 
-          g_date_time_unref(dt);
-          g_free(cycle);
+          if (dt)
+            g_date_time_unref(dt);
         }
 
       }
-      else if (!strcmp(st, "O"))
+      else if (s_json_string_match(stype, "O"))
       {
         s_json_gen_member_string(gen, "subscription_type", "One-time");
         if (suntil)
@@ -745,11 +743,10 @@ servbw_limit: json[0].srvratio,
           if (until)
             s_json_gen_member_build(gen, "subscription_until", "%S", g_date_time_format(dt, "%F"));
 
-          g_date_time_unref(dt);
+          if (dt)
+            g_date_time_unref(dt);
         }
       }
-
-      g_free(st);
     }
   }
 
