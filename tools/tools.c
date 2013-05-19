@@ -533,8 +533,9 @@ MegaSession* tool_start_session(void)
   }
 
 err:
-  g_object_unref(session);
   g_clear_error(&local_err);
+  tool_fini(session);
+  exit(1);
   return NULL;
 
 out:

@@ -102,15 +102,14 @@ int main(int ac, char* av[])
   }
 
   s = tool_start_session();
-  if (!s)
-    return 1;
 
   gchar* info = mega_session_get_info(s, &local_err);
   if (!info)
   {
     g_printerr("ERROR: Can't determine disk usage: %s\n", local_err ? local_err->message : "unknown error");
     g_clear_error(&local_err);
-    goto err;
+    tool_fini(s);
+    return 1;
   }
 
   gint64 total = s_json_get_member_int(info, "total_storage", -1);
@@ -141,8 +140,4 @@ int main(int ac, char* av[])
   g_free(info);
   tool_fini(s);
   return 0;
-
-err:
-  tool_fini(s);
-  return 1;
 }
