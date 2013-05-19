@@ -21,8 +21,9 @@ SYNOPSIS
 'megarm' /Contacts/<contactemail>
 'megadl' [--no-progress] [--path <path>] <links>...
 'megadl' --path - <filelink>
-'megareg' [--scripted] --register --email <email> --name <realname> --password <password>
-'megareg' [--scripted] --verify <state> <link>
+'megareg' [--script] --email <email> --name <realname> --password <password>
+'megareg' [--script] --anonymous --password <password>
+'megareg' [--script] --verify <link> --state <state> 
 'megafs' [-o <options>...] [-d] [-f] <mountpoint>
 
 
@@ -95,9 +96,34 @@ CONFIGURATION FILES
 See man:megarc[5] for information about mega configuration file.
 
 
+ACCOUNT TYPES
+-------------
 
+Megatools allow you to create and access two account types:
 
+. Ephemeral (temporary anonymous) accounts
+. Fully verified permanent accounts associated with an email
 
+To login to ephemeral account you need to provide user handle (11 character
+string) and password. To login to standard account, you need to provide email
+and password.
+
+Ephemeral account is anonymous, and Mega.co.nz removes these accounts and files
+associated with them on regular basis. You can use it if you want to quickly
+share a file with someone, and don't care that it may get removed by Mega.co.nz
+at any time. Ephemeral accounts don't need email verification step.
+
+* For example:
++
+------------
+$ megareg --anonymous --password qweqwe
+New anonymous account was registered with user handle 'xAsf7a4sDDa'
+$ megals --username xAsf7a4sDDa --password qweqwe
+/Contacts 
+/Inbox 
+/Root 
+/Trash
+------------
 
 
 SESSION CACHE
