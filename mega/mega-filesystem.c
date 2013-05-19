@@ -396,7 +396,7 @@ gboolean mega_filesystem_load(MegaFilesystem* filesystem, GError** error)
         list = g_list_prepend(list, node);
       else
       {
-        g_printerr("WARNING: Skipping import of node: %s\n", local_err->message ? local_err->message : "?");
+        g_printerr("WARNING: Skipping import of node: %s\n", local_err ? local_err->message : "unknown reason");
         g_clear_error(&local_err);
         g_object_unref(node);
       }
@@ -425,7 +425,7 @@ gboolean mega_filesystem_load(MegaFilesystem* filesystem, GError** error)
         list = g_list_prepend(list, node);
       else
       {
-        g_printerr("WARNING: Skipping import of node: %s\n", local_err->message ? local_err->message : "?");
+        g_printerr("WARNING: Skipping import of node: %s\n", local_err ? local_err->message : "unknown reason");
         g_clear_error(&local_err);
         g_object_unref(node);
       }
