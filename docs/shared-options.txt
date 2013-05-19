@@ -13,8 +13,8 @@ ifndef::mega-no-login[]
 --ignore-config-file::
 	Disable loading .megarc
 
---no-ask-password::
-	Never ask interactively for a password
+--non-interactive::
+	Never interactively ask for user input
 
 --reload::
 	Don't use cache to load session and filesystem information

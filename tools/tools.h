@@ -17,8 +17,8 @@
  *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#ifndef __TOOLS_H
-#define __TOOLS_H
+#ifndef __TOOLS_H__
+#define __TOOLS_H__
 
 #include <glib.h>
 #include <glib/gstdio.h>
@@ -53,5 +53,11 @@ void            tool_init_bare        (gint* ac, gchar*** av, const gchar* tool_
 void            tool_init             (gint* ac, gchar*** av, const gchar* tool_name, GOptionEntry* tool_entries);
 MegaSession*    tool_start_session    (void);
 void            tool_fini             (MegaSession* s);
+
+gchar*          tool_prompt           (gboolean echo, const gchar* format, ...);
+gboolean        tool_is_interactive   (void);
+
+gboolean        is_email_valid        (const gchar* email);
+gboolean        is_user_handle_valid  (const gchar* handle);
 
 #endif
