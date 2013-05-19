@@ -85,6 +85,10 @@ man:megafs[1]::
 	Mount remote filesystem locally.
 
 
+Each of the individual tools have help that can be accessed using `--help`
+parameter.
+
+
 CONFIGURATION FILES
 -------------------
 
@@ -92,8 +96,6 @@ See man:megarc[5] for information about mega configuration file.
 
 
 
-Each of the individual tools have help that can be accessed using --help
-parameter.
 
 
 
