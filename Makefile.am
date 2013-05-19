@@ -1,6 +1,6 @@
 ACLOCAL_AMFLAGS = -I m4
 
-SUBDIRS = sjson mega tests tools docs
+SUBDIRS = sjson mega tools tests docs
 
 EXTRA_DIST = LICENSE Makefile.glib HACKING
 
