@@ -108,6 +108,52 @@ you'll need to refresh your session cache. This can be done by using the
 --reload option to any tool, or by waiting for a cache timeout (default timeout is set to 10 minutes).
 
 
+RUNNING FROM CONSOLE (DEALING WITH WARNINGS)
+--------------------------------------------
+
+Megatools uses gio library which reads some configuration options from dconf via
+dbus. This poses no problems when you run megatools from within a desktop
+environment.
+
+If you want to run megatools from console, in order to avoid warnings like this:
+
+------------
+** WARNING **: Error spawning command line 
+  `dbus-launch --autolaunch=62d47e5eda4e964df3953a9c000004de 
+  --binary-syntax --close-stderr': Failed to execute child 
+  process "dbus-launch" (No such file or directory)
+------------
+
+or this:
+
+------------
+** WARNING **: Command line 
+  `dbus-launch --autolaunch=71897713888b9be27b7527c85194adf8 
+  --binary-syntax --close-stderr' exited with non-zero 
+  exit status 1: Autolaunch error: X11 initialization failed.
+------------
+
+you need to setup dbus session bus yourself. This can be done automatically using
+man:dbus-launch[1] program. All you need to do is run the individual tools
+using man:dbus-launch[1], like this:
+
+------------
+$ dbus-launch megals
+$ dbus-launch megadf --human
+------------
+
+Also, if your system doesn't have man:dconf[1] installed, you may also get this
+warning:
+
+-----------
+GLib-GIO-Message: Using the 'memory' GSettings backend.  Your 
+  settings will not be saved or shared with other applications.
+-----------
+
+To solve it, install man:dconf[1].
+
+These are just warnings, and megatools should run fine even if you see them.
+
 
 include::remote-paths.txt[]
 
