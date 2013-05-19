@@ -121,6 +121,7 @@ gboolean mega_file_key_load_ubase64(MegaFileKey* file_key, const gchar* data)
   unpack_node_key(file_key->priv->key, aes_key_binary, NULL, NULL);
   mega_aes_key_load_binary(MEGA_AES_KEY(file_key), aes_key_binary);
 
+  g_free(key);
   return TRUE;
 }
 

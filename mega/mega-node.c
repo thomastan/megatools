@@ -438,8 +438,11 @@ gboolean mega_node_load(MegaNode* node, const gchar* json, GError** error)
   if (!decrypt_node_attrs(a, priv->key, &priv->name))
   {
     g_set_error(error, MEGA_NODE_ERROR, MEGA_NODE_ERROR_OTHER, "Node attributes are malformed");
+    g_free(a);
     return FALSE;
   }
+
+  g_free(a);
 
   if (!priv->name)
   {

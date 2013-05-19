@@ -429,8 +429,6 @@ static gboolean goto_state(MegaHttpClient* http_client, gint target_state, GCanc
 
   MegaHttpClientPrivate* priv = http_client->priv;
 
-  //g_print("GOTO %d -> %d\n", priv->conn_state, target_state);
-
   // we can always transition to NONE/FAILED states by disconnecting
   if (target_state == CONN_STATE_NONE || target_state == CONN_STATE_FAILED)
   {

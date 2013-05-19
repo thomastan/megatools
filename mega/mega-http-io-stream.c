@@ -32,6 +32,8 @@
 struct _MegaHttpIOStreamPrivate
 {
   MegaHttpClient* client;
+  GInputStream* is;
+  GOutputStream* os;
 };
 
 // {{{ GObject property and signal enums
@@ -68,14 +70,20 @@ static GInputStream* get_input_stream(GIOStream* stream)
 {
   MegaHttpIOStream* http_io_stream = MEGA_HTTP_IO_STREAM(stream);
 
-  return G_INPUT_STREAM(mega_http_input_stream_new(http_io_stream->priv->client));
+  if (!http_io_stream->priv->is)
+    http_io_stream->priv->is = G_INPUT_STREAM(mega_http_input_stream_new(http_io_stream->priv->client));
+
+  return http_io_stream->priv->is;
 }
 
 static GOutputStream* get_output_stream(GIOStream* stream)
 {
   MegaHttpIOStream* http_io_stream = MEGA_HTTP_IO_STREAM(stream);
 
-  return G_OUTPUT_STREAM(mega_http_output_stream_new(http_io_stream->priv->client));
+  if (!http_io_stream->priv->os)
+    http_io_stream->priv->os = G_OUTPUT_STREAM(mega_http_output_stream_new(http_io_stream->priv->client));
+
+  return http_io_stream->priv->os;
 }
 
 static gboolean close_fn(GIOStream* stream, GCancellable* cancellable, GError** error)
@@ -138,6 +146,8 @@ static void mega_http_io_stream_finalize(GObject *object)
   MegaHttpIOStream *http_io_stream = MEGA_HTTP_IO_STREAM(object);
 
   g_clear_object(&http_io_stream->priv->client);
+  g_clear_object(&http_io_stream->priv->is);
+  g_clear_object(&http_io_stream->priv->os);
 
   G_OBJECT_CLASS(mega_http_io_stream_parent_class)->finalize(object);
 }

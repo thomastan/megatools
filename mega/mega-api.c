@@ -382,6 +382,7 @@ void mega_api_set_session_id(MegaApi* api, const gchar* session_id)
 {
   g_return_if_fail(MEGA_IS_API(api));
 
+  g_free(api->priv->sid);
   api->priv->sid = g_strdup(session_id);
 }
 

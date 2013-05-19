@@ -508,7 +508,6 @@ gboolean mega_session_save(MegaSession* session, GError** error)
     path = get_cache_path(priv->user_handle);
 
   gchar* cache_data = mega_session_get_json(session);
-  //g_print("%s\n", s_json_pretty(cache_data));
 
   gchar* tmp = g_strconcat("MEGA", cache_data, NULL);
   gchar* cipher = mega_aes_key_encrypt_string_cbc(priv->password_key, tmp);
@@ -1303,6 +1302,8 @@ gboolean mega_session_set_json(MegaSession* session, const gchar* json)
   if (s_json_get_member_int(json, "version", 0) != CACHE_FORMAT_VERSION)
     return FALSE;
 
+  mega_session_close(session);
+
   gchar* sid = s_json_get_member_string(json, "sid");
   mega_api_set_session_id(priv->api, sid);
   g_free(sid);
@@ -1310,12 +1311,8 @@ gboolean mega_session_set_json(MegaSession* session, const gchar* json)
   priv->is_open = TRUE;
   priv->last_refresh = s_json_get_member_int(json, "last_refresh", 0);
 
-  g_clear_object(&priv->password_key);
   priv->password_key = s_json_get_member_aes_key(json, "password_key");
-
-  g_clear_object(&priv->master_key);
   priv->master_key = s_json_get_member_aes_key(json, "master_key");
-
   if (priv->master_key)
   {
     gchar* pubk = s_json_get_member_string(json, "rsa_pubk");
@@ -1323,7 +1320,6 @@ gboolean mega_session_set_json(MegaSession* session, const gchar* json)
 
     if (pubk && privk)
     {
-      g_clear_object(&priv->rsa_key);
       priv->rsa_key = mega_rsa_key_new();
 
       if (!mega_rsa_key_load_enc_privk(priv->rsa_key, privk, priv->master_key) || !mega_rsa_key_load_pubk(priv->rsa_key, pubk)) 
@@ -1451,8 +1447,6 @@ static void mega_session_dispose(GObject *object)
   MegaSession *session = MEGA_SESSION(object);
   MegaSessionPrivate *priv = session->priv;
 
-  g_clear_object(&priv->filesystem);
-
   G_OBJECT_CLASS(mega_session_parent_class)->dispose(object);
 }
 
@@ -1464,6 +1458,7 @@ static void mega_session_finalize(GObject *object)
   mega_session_close(session);
 
   g_clear_object(&priv->api);
+  g_clear_object(&priv->filesystem);
 
   G_OBJECT_CLASS(mega_session_parent_class)->finalize(object);
 }

@@ -243,6 +243,7 @@ gboolean mega_aes_key_load_ubase64(MegaAesKey* aes_key, const gchar* data)
 
   mega_aes_key_load_binary(aes_key, key);
 
+  g_free(key);
   return TRUE;
 }
 
@@ -295,6 +296,7 @@ gboolean mega_aes_key_load_enc_ubase64(MegaAesKey* aes_key, const gchar* data, M
 
   mega_aes_key_load_enc_binary(aes_key, key, dec_key);
 
+  g_free(key);
   return TRUE;
 }
 
