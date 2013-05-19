@@ -493,7 +493,9 @@ MegaSession* tool_start_session(void)
       if (!mega_session_login_anon(session, opt_username, opt_password, &local_err))
       {
         if (g_error_matches(local_err, MEGA_API_ERROR, MEGA_API_ERROR_ENOENT))
-          g_printerr("ERROR: Incorrect username or password for account '%s'\n", opt_username);
+          g_printerr("ERROR: User account '%s' doesn't exist\n", opt_username);
+        else if (g_error_matches(local_err, MEGA_SESSION_ERROR, MEGA_SESSION_ERROR_WRONG_PASSWORD))
+          g_printerr("ERROR: Incorrect password for account '%s'\n", opt_username);
         else
           g_printerr("ERROR: Login failed: %s\n", local_err ? local_err->message : "unknown error");
 
