@@ -178,102 +178,65 @@ static void update_maps(MegaFilesystem* filesystem)
   g_list_free(nodes);
 }
 
-static gchar* path_sanitize_slashes(const gchar* path)
+static gchar** remotepath_split(const gchar* path)
 {
+  gchar **parts, **next_in, **next_out;
+
   g_return_val_if_fail(path != NULL, NULL);
 
-  gchar* sanepath = g_malloc(strlen(path) + 1);
-  gchar* tmp = sanepath;
-  gboolean previous_was_slash = 0;
-
-  while (*path != '\0')
+  // ignore empty and relative paths
+  next_out = next_in = parts = g_strsplit(path, "/", 0);
+  if (parts == NULL || *parts == NULL || parts[0][0] != '\0')
   {
-    if (*path != '/' || !previous_was_slash)
-      *(tmp++) = *path;
-
-    previous_was_slash = *path == '/' ? 1 : 0;
-    path++;
+    g_strfreev(parts);
+    return NULL;
   }
 
-  *tmp = '\0';
-  if (tmp > (sanepath + 1) && *(tmp - 1) == '/')
-    *(tmp-1) = '\0';
-
-  return sanepath;
-}
-
-static gchar** path_get_elements(const gchar* path)
-{
-  g_return_val_if_fail(path != NULL, NULL);
-
-  gchar* sane_path = path_sanitize_slashes(path); /* always succeeds */
-  gchar** pathv = g_strsplit(sane_path, "/", 0);
-  g_free(sane_path);
-
-  return pathv;
-}
-
-G_GNUC_UNUSED
-static gchar* path_simplify(const gchar* path)
-{
-  gchar **pathv, **sane_pathv;
-  guint i, j = 0, pathv_len, subroot = 0;
-  gboolean absolute;
-
-  g_return_val_if_fail(path != NULL, NULL);
-  
-  pathv = path_get_elements(path); /* should free */
-  pathv_len = g_strv_length(pathv);
-  
-  sane_pathv = (gchar**)g_malloc0((pathv_len + 1) * sizeof(gchar*));
-  absolute = (pathv_len > 1 && **pathv == '\0');
-  
-  for (i = 0; i < pathv_len; i++)
+  while (*next_in)  
   {
-    if (!strcmp(pathv[i], "."))
-      continue; /* ignore curdirs in path */
-    else if (!strcmp(pathv[i], ".."))
+    if (!strcmp(*next_in, ".."))
     {
-      if (absolute)
+      if (next_out != parts)
       {
-        if (j > 1)
-        {
-          j--;
-        }
+        next_out--;
+        g_free(*next_out);
       }
-      else
-      {
-        if (subroot && !strcmp(sane_pathv[j - 1], "..")) /* if we are off base and last item is .. */
-        {
-          sane_pathv[j++] = pathv[i];
-        }
-        else
-        {
-          if (j > subroot)
-          {
-            j--;
-          }
-          else
-          {
-            subroot++;
-            sane_pathv[j++] = pathv[i];
-          }
-        }
-      }
+
+      g_free(*next_in);
     }
+    else if (!strcmp(*next_in, ".") || !strcmp(*next_in, ""))
+      g_free(*next_in);
     else
-    {
-      sane_pathv[j++] = pathv[i];
-    }
+      *next_out++ = *next_in;
+
+    next_in++;
   }
 
-  sane_pathv[j] = 0;
-  gchar* simple_path = g_strjoinv("/", sane_pathv);
+  *next_out = NULL;
+  
+  return parts;
+}
 
-  g_strfreev(pathv);
-  g_free(sane_pathv);
+static gchar* remotepath_join(gchar** parts)
+{
+  gchar** next = parts;
+  GString* path;
 
-  return simple_path;
+  if (parts == NULL)
+    return NULL;
+
+  if (*parts == NULL)
+    return g_strdup("/");
+
+  path = g_string_sized_new(200);
+  while (*next)
+  {
+    g_string_append_c(path, '/');
+    g_string_append(path, *next);
+    next++;
+  }
+
+  return g_string_free(path, FALSE);
 }
 
 /**
@@ -726,39 +689,23 @@ MegaNode* mega_filesystem_get_node(MegaFilesystem* filesystem, const gchar* hand
 GSList* mega_filesystem_glob(MegaFilesystem* filesystem, const gchar* glob)
 {
   gchar** glob_parts;
-  GPtrArray* parts;
-  gint i;
+  gchar** next_pattern;
 
   g_return_val_if_fail(MEGA_IS_FILESYSTEM(filesystem), NULL);
   g_return_val_if_fail(glob != NULL, NULL);
 
   // skip relative glob paterns
-  glob_parts = g_regex_split_simple("/+", glob, 0, G_REGEX_MATCH_NOTEMPTY);
-  if (glob_parts == NULL || glob_parts[0][0] != '\0')
+  next_pattern = glob_parts = remotepath_split(glob);
+  if (glob_parts == NULL)
     return NULL;
-
-  // preprocess glob patern (.. and .)
-  parts = g_ptr_array_sized_new(g_strv_length(glob_parts));
-  for (i = 1; glob_parts[i]; i++)  
-  {
-    if (!strcmp(glob_parts[i], ".."))
-    {
-      if (parts->len > 0)
-        g_ptr_array_remove_index(parts, parts->len - 1);
-    }
-    else if (strcmp(glob_parts[i], ".") && strcmp(glob_parts[i], ""))
-      g_ptr_array_add(parts, glob_parts[i]);
-  }
 
   // create list of root nodes filtered by pattern
   GSList *full_list = NULL, *filtered_list = NULL, *iter;
-  for (i = 0; i < parts->len; i++)  
+  while (*next_pattern)  
   {
-    gchar* pattern = g_ptr_array_index(parts, i);
-
     // create list of nodes for filtering
     g_slist_free_full(full_list, g_object_unref);
-    if (i == 0)
+    if (next_pattern == glob_parts)
     {
       full_list = mega_filesystem_get_root_nodes(filesystem);
     }
@@ -781,14 +728,15 @@ GSList* mega_filesystem_glob(MegaFilesystem* filesystem, const gchar* glob)
     {
       MegaNode* node = iter->data;
 
-      if (g_pattern_match_simple(pattern, mega_node_get_name(node)))
+      if (g_pattern_match_simple(*next_pattern, mega_node_get_name(node)))
         filtered_list = g_slist_prepend(filtered_list, g_object_ref(node));
     }
+
+    next_pattern++;
   }
 
   g_slist_free_full(full_list, g_object_unref);
   g_strfreev(glob_parts);
-  g_ptr_array_unref(parts);
 
   return g_slist_reverse(filtered_list);
 }
