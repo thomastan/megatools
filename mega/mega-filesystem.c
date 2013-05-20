@@ -812,6 +812,99 @@ GSList* mega_filesystem_get_root_nodes(MegaFilesystem* filesystem)
   return g_slist_copy_deep(priv->root_nodes, (GCopyFunc)g_object_ref, NULL);
 }
 
+/**
+ * mega_filesystem_export_nodes:
+ * @filesystem: a #MegaFilesystem
+ * @nodes: (element-type MegaNode) (transfer none): List of nodes.
+ * @error: Error.
+ *
+ * Export selected nodes. (ie. Set link attribute of passed #nodes.)
+ *
+ * Returns: #TRUE on success.
+ */
+gboolean mega_filesystem_export_nodes(MegaFilesystem* filesystem, GSList* nodes, GError** error)
+{
+  GError* local_err = NULL;
+  GSList* i;
+  GPtrArray* rnodes;
+  MegaSession* session = NULL;
+  gboolean result = FALSE;
+  gchar *response, *request;
+  SJsonGen* gen;
+
+  g_return_val_if_fail(MEGA_IS_FILESYSTEM(filesystem), FALSE);
+  g_return_val_if_fail(error == NULL || *error == NULL, FALSE);
+
+  if (g_slist_length(nodes) == 0)
+    return TRUE;
+
+  session = mega_filesystem_get_session(filesystem);
+  g_return_val_if_fail(session != NULL, FALSE);
+
+  rnodes = g_ptr_array_sized_new(g_slist_length(nodes));
+
+  // perform request
+  gen = s_json_gen_new();
+  s_json_gen_start_array(gen);
+  for (i = nodes; i; i = i->next)
+  {
+    MegaNode* node = i->data;
+
+    if (mega_node_is(node, MEGA_NODE_TYPE_FILE))
+    {
+      s_json_gen_build(gen, "{a:l, n:%s}", mega_node_get_handle(node));
+      g_ptr_array_add(rnodes, node);
+    }
+  }
+  s_json_gen_end_array(gen);
+  request = s_json_gen_done(gen);
+  response = mega_api_call(mega_session_get_api(session), request, &local_err);
+  g_free(request);
+
+  // process response
+  if (!response)
+  {
+    g_propagate_error(error, local_err);
+    goto out;
+  }
+  
+  // check that we got an array
+  if (s_json_get_type(response) == S_JSON_TYPE_ARRAY)
+  {
+    // count number of results
+    gint n = 0;
+    S_JSON_FOREACH_ELEMENT(response, link_json)
+      n++;
+    S_JSON_FOREACH_END()
+
+    // check that it matches the request
+    if (n != rnodes->len)
+    {
+      g_set_error(error, MEGA_FILESYSTEM_ERROR, MEGA_FILESYSTEM_ERROR_OTHER, "API call 'l' results mismatch");
+      goto out;
+    }
+
+    // add external link info to nodes
+    n = 0;
+    S_JSON_FOREACH_ELEMENT(response, link_json)
+      MegaNode* node = g_ptr_array_index(rnodes, n);
+
+      gchar* link = s_json_get_string(link_json);
+      g_object_set(node, "link", link, NULL);
+      g_free(link);
+
+      n++;
+    S_JSON_FOREACH_END()
+  }
+
+  result = TRUE;
+out:
+  g_free(response);
+  g_ptr_array_free(rnodes, TRUE);
+  g_object_unref(session);
+  return result;
+}
+
 // {{{ GObject type setup
 
 static void mega_filesystem_set_property(GObject *object, guint property_id, const GValue *value, GParamSpec *pspec)

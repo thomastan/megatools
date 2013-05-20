@@ -511,6 +511,22 @@ gboolean mega_node_load_user(MegaNode* node, const gchar* json, GError** error)
 }
 
 /**
+ * mega_node_is:
+ * @node: a #MegaNode
+ * @type: Node type.
+ *
+ * Check if node is of a given type.
+ *
+ * Returns: #TRUE if it is.
+ */
+gboolean mega_node_is(MegaNode* node, MegaNodeType type)
+{
+  g_return_val_if_fail(MEGA_IS_NODE(node), FALSE);
+
+  return node->priv->type == type;
+}
+
+/**
  * mega_node_is_child:
  * @node: a #MegaNode
  * @parent: (transfer none) (allow-none):
@@ -864,6 +880,35 @@ GSList* mega_node_get_children(MegaNode* node)
 }
 
 /**
+ * mega_node_collect_children:
+ * @node: a #MegaNode
+ *
+ * Get list of child nodes of this node at all levels.
+ *
+ * Returns: (transfer full) (element-type MegaNode): List of child nodes.
+ */
+GSList* mega_node_collect_children(MegaNode* node)
+{
+  MegaNodePrivate* priv;
+  GList* iter;
+  GSList* result = NULL;
+
+  g_return_val_if_fail(MEGA_IS_NODE(node), NULL);
+
+  priv = node->priv;
+
+  for (iter = priv->children; iter; iter = iter->next)
+  {
+    MegaNode* child = iter->data;
+
+    result = g_slist_prepend(result, g_object_ref(child));
+    result = g_slist_concat(result, mega_node_collect_children(child));
+  }
+
+  return g_slist_reverse(result);
+}
+
+/**
  * mega_node_get_parent:
  * @node: a #MegaNode
  *
@@ -880,6 +925,50 @@ MegaNode* mega_node_get_parent(MegaNode* node)
   priv = node->priv;
 
   return g_weak_ref_get(&priv->parent);
+}
+
+/**
+ * mega_node_get_public_url:
+ * @node: a #MegaNode
+ * @include_key: 
+ *
+ * Description...
+ *
+ * Returns: 
+ */
+gchar* mega_node_get_public_url(MegaNode* node, gboolean include_key)
+{
+  MegaNodePrivate* priv;
+
+  g_return_val_if_fail(MEGA_IS_NODE(node), NULL);
+
+  priv = node->priv;
+
+  if (priv->link)
+  {
+    if (include_key)
+    {
+      if (priv->key)
+      {
+        gchar* key;
+
+        if (MEGA_IS_FILE_KEY(priv->key))
+          key = mega_file_key_get_ubase64(MEGA_FILE_KEY(priv->key));
+        else if (MEGA_IS_AES_KEY(priv->key))
+          key = mega_aes_key_get_ubase64(priv->key);
+        else
+          return NULL;
+
+        gchar* tmp = g_strdup_printf("https://mega.co.nz/#!%s!%s", priv->link, key);
+        g_free(key);
+        return tmp;
+      }
+    }
+    else
+      return g_strdup_printf("https://mega.co.nz/#!%s", priv->link);
+  }
+
+  return NULL;
 }
 
 // {{{ GObject type setup

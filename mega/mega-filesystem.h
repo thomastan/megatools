@@ -76,6 +76,8 @@ MegaNode*               mega_filesystem_get_node        (MegaFilesystem* filesys
 GSList*                 mega_filesystem_glob            (MegaFilesystem* filesystem, const gchar* glob);
 GSList*                 mega_filesystem_get_root_nodes  (MegaFilesystem* filesystem);
 
+gboolean                mega_filesystem_export_nodes    (MegaFilesystem* filesystem, GSList* nodes, GError** error);
+
 G_END_DECLS
 
 #endif

@@ -24,29 +24,40 @@ static gboolean opt_recursive;
 static gboolean opt_long;
 static gboolean opt_human;
 static gboolean opt_export;
-//static gboolean opt_color;
 static gboolean opt_header;
 
 static GOptionEntry entries[] =
 {
-  { "names",         'n',   0, G_OPTION_ARG_NONE,    &opt_names,        "List names of files only (will be disabled if you specify multiple paths)",     NULL },
-  { "recursive",     'R',   0, G_OPTION_ARG_NONE,    &opt_recursive,    "List files in subdirectories",                NULL },
+  { "names",         'n',   0, G_OPTION_ARG_NONE,    &opt_names,        "Print file and folder names only",            NULL },
+  { "recursive",     'R',   0, G_OPTION_ARG_NONE,    &opt_recursive,    "List files and folders recursively",          NULL },
   { "long",          'l',   0, G_OPTION_ARG_NONE,    &opt_long,         "Use a long listing format",                   NULL },
   { "header",       '\0',   0, G_OPTION_ARG_NONE,    &opt_header,       "Show columns header in long listing",         NULL },
-  { "human",         'h',   0, G_OPTION_ARG_NONE,    &opt_human,        "Use a long listing format",                   NULL },
-  //{ "color",         'c',   0, G_OPTION_ARG_NONE,    &opt_color,        "Use color highlighting of node types",        NULL },
+  { "human",         'h',   0, G_OPTION_ARG_NONE,    &opt_human,        "Format file sizes in human readable way",     NULL },
   { "export",        'e',   0, G_OPTION_ARG_NONE,    &opt_export,       "Show mega.co.nz download links (export)",     NULL },
   { NULL }
 };
 
-static gint compare_node(mega_node* a, mega_node* b)
+static gint compare_node(MegaNode* a, MegaNode* b)
 {
-  return strcmp(a->path, b->path);
+  const gchar* ap = mega_node_get_path(a);
+  const gchar* bp = mega_node_get_path(b);
+
+  if (ap == NULL && bp == NULL)
+    return 0;
+
+  if (ap == NULL)
+    return -1;
+
+  if (bp == NULL)
+    return 1;
+
+  return strcmp(ap, bp);
 }
 
 int main(int ac, char* av[])
 {
-  mega_session* s;
+  MegaSession* s;
+  MegaFilesystem* fs;
   GError *local_err = NULL;
   GSList *l = NULL, *i;
   gint j;
@@ -54,41 +65,45 @@ int main(int ac, char* av[])
   tool_init(&ac, &av, "- list files stored at mega.co.nz", entries);
 
   s = tool_start_session();
-  if (!s)
-    return 1;
+  fs = mega_session_get_filesystem(s);
 
   // gather nodes
+
   if (ac == 1)
   {
-    l = mega_session_ls_all(s);
-    opt_names = FALSE;
+    l = mega_filesystem_filter_nodes(fs, NULL, NULL);
   }
   else
   {
-    if (ac > 2 || opt_recursive)
-      opt_names = FALSE;
-
     for (j = 1; j < ac; j++)
-    {
-      mega_node* n = mega_session_stat(s, av[j]);
-      if (n && (n->type == MEGA_NODE_FILE || !opt_names))
-        l = g_slist_append(l, n);
+      l = g_slist_concat(l, mega_filesystem_glob(fs, av[j]));
 
-      l = g_slist_concat(l, mega_session_ls(s, av[j], opt_recursive));
+    if (opt_recursive)
+    {
+      for (i = l; i; i = i->next)
+      {
+        MegaNode* node = i->data;
+
+        if (!mega_node_is(node, MEGA_NODE_TYPE_FILE))
+          l = g_slist_concat(l, mega_node_collect_children(node));
+      }
     }
   }
 
   l = g_slist_sort(l, (GCompareFunc)compare_node);
 
-  // export if requested
-  if (opt_export && !mega_session_addlinks(s, l, &local_err))
+  // export files if requested
+  
+  if (opt_export && !mega_filesystem_export_nodes(fs, l, &local_err))
   {
-    g_printerr("ERROR: Can't read links info from mega.co.nz: %s\n", local_err->message);
+    g_printerr("ERROR: Can't read links info from mega.co.nz: %s\n", local_err ? local_err->message : "unknown error");
     g_slist_free(l);
     g_clear_error(&local_err);
     tool_fini(s);
     return 1;
   }
+
+  // output
 
   if (l && opt_long && opt_header && !opt_export)
   {
@@ -99,40 +114,51 @@ int main(int ac, char* av[])
 
   for (i = l; i; i = i->next)
   {
-    mega_node* n = i->data;
+    MegaNode* node = i->data;
 
     if (opt_export)
-      g_print("%73s ", n->link ? mega_node_get_link(n, TRUE) : "");
+    {
+      gchar* link = mega_node_get_public_url(node, TRUE);
+      if (link)
+        g_print("%73s ", link);
+
+      g_free(link);
+    }
 
     if (opt_long)
     {
-      GDateTime* dt = g_date_time_new_from_unix_local(n->timestamp);
+      gint64 ts, size;
+      gint type;
+      gchar* owner_handle;
+      g_object_get(node, "timestamp", &ts, "size", &size, "type", &type, "owner-handle", &owner_handle, NULL);
+
+      GDateTime* dt = g_date_time_new_from_unix_local(ts);
       gchar* time_str = g_date_time_format(dt, "%Y-%m-%d %H:%M:%S");
       g_date_time_unref(dt);
 
       gchar* size_str;
       if (opt_human)
-        size_str = n->size > 0 ? g_format_size_full(n->size, G_FORMAT_SIZE_IEC_UNITS) : g_strdup("-");
+        size_str = size > 0 ? g_format_size_full(size, G_FORMAT_SIZE_IEC_UNITS) : g_strdup("-");
       else
-        size_str = n->size > 0 ? g_strdup_printf("%" G_GUINT64_FORMAT, n->size) : g_strdup("-");
+        size_str = size > 0 ? g_strdup_printf("%" G_GUINT64_FORMAT, size) : g_strdup("-");
 
       g_print("%-11s %-11s %d %13s %19s %s\n",
-        n->handle, 
-        n->user_handle ? n->user_handle : "",
-        n->type,
+        mega_node_get_handle(node), 
+        owner_handle ? owner_handle : "",
+        type,
         size_str,
-        n->timestamp > 0 ? time_str : "", 
-        opt_names ? n->name : n->path
+        ts > 0 ? time_str : "", 
+        opt_names ? mega_node_get_name(node) : mega_node_get_path(node)
       );
 
       g_free(time_str);
       g_free(size_str);
     }
     else
-      g_print("%s\n", opt_names ? n->name : n->path);
+      g_print("%s\n", opt_names ? mega_node_get_name(node) : mega_node_get_path(node));
   }
 
-  g_slist_free(l);
+  g_slist_free_full(l, (GDestroyNotify)g_object_unref);
   tool_fini(s);
   return 0;
 }

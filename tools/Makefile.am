@@ -22,7 +22,7 @@ megafs_CFLAGS = \
   $(AM_CFLAGS) \
   $(FUSE_CFLAGS)
 
-bin_PROGRAMS = megareg megadf # megals megamkdir megamv megarm # megadl megaget megaput megasync
+bin_PROGRAMS = megareg megadf megals # megamkdir megamv megarm # megadl megaget megaput megasync
 
 megadf_SOURCES     = df.c
 megadl_SOURCES     = dl.c

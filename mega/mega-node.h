@@ -71,6 +71,7 @@ MegaNode*               mega_node_new_contacts          (MegaFilesystem* filesys
 gboolean                mega_node_load                  (MegaNode* node, const gchar* json, GError** error);
 gboolean                mega_node_load_user             (MegaNode* node, const gchar* json, GError** error);
 
+gboolean                mega_node_is                    (MegaNode* node, MegaNodeType type);
 gboolean                mega_node_is_child              (MegaNode* node, MegaNode* parent);
 const gchar*            mega_node_get_handle            (MegaNode* node);
 const gchar*            mega_node_get_name              (MegaNode* node);
@@ -86,7 +87,9 @@ void                    mega_node_add_child             (MegaNode* node, MegaNod
 void                    mega_node_remove_child          (MegaNode* node, MegaNode* child);
 void                    mega_node_remove_children       (MegaNode* node);
 GSList*                 mega_node_get_children          (MegaNode* node);
+GSList*                 mega_node_collect_children      (MegaNode* node);
 MegaNode*               mega_node_get_parent            (MegaNode* node);
+gchar*                  mega_node_get_public_url        (MegaNode* node, gboolean include_key);
 
 G_END_DECLS
 
