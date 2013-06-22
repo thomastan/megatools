@@ -368,3 +368,18 @@ operates.
 
 'configure' also accepts some other, not widely useful, options.  Run
 'configure --help' for more details.
+
+
+Installation on Mac OS X (Mountain Lion)
+========================================
+
+1. Install glib-networking with a ca-bundle:
+    1. `export BUNDLE=/usr/local/share/ca-bundle.crt`
+    2. `curl http://curl.haxx.se/ca/cacert.pem -o $BUNDLE`
+    3. `/usr/bin/sed -ie "s|--without-ca-certificates|--with-ca-certificates=$BUNDLE|" /usr/local/Library/Formula/glib-networking.rb`.
+    4. `brew install glib-networking`
+
+2. Make the pkgconfig (.pc) file for libcurl findable by megatools configure script:
+    `export PKG_CONFIG_PATH=/usr/local/Library/ENV/pkgconfig/10.8`
+
+6. Untar megatools, run `./configure`, `make`, `make check` and `make install` as usual.
